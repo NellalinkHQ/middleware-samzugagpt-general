@@ -1,0 +1,38 @@
+name: Deploy Latest Code to Live Server
+on:
+  push:
+    branches:
+      - live
+jobs:
+  server-deploy:
+    name: Deploy to Live Server
+    runs-on: ubuntu-latest
+    steps:
+    
+   # Step : Get the Latest repo code
+    - name: 🚚 Get latest code
+      uses: actions/checkout@v3
+      
+   # Step : Check for required files in the dist folder
+    - name: ✅ Verify Required Files
+      run: |
+          if [ ! -f app.js ] || [ ! -f package.json ]; then
+            echo "Required files (app.js or package.json) are missing in the deployment!"
+            exit 1
+          fi
+
+    - name: 📂 Sync Files to Middey
+      uses: SamKirkland/FTP-Deploy-Action@4.3.0
+      with:
+        server:   samzugagpt-v2.ftp.evennode.com
+        username: samzugagpt-v2_dd325
+        password: ${{ secrets.GIT_FTP_AUTODEPLOY_PASSWORD }}
+        port: 21
+        protocol: ftp
+
+   
+    #  server: ${{ secrets.GIT_FTP_AUTODEPLOY_SERVER }}
+    #  username: ${{ secrets.GIT_FTP_AUTODEPLOY_USERNAME }}
+    #  password: ${{ secrets.GIT_FTP_AUTODEPLOY_PASSWORD }}
+    #  local-dir: ./dist/ 
+    #  server-dir: app.example.com/ 
