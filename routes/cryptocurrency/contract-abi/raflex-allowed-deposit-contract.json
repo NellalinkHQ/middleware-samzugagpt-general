@@ -1,0 +1,18 @@
+[{
+            "0x337610d27c682e347c9cd60bd4b3b107c9d34ddd": {
+                "token_name": "Tether USDT",
+                "token_symbol": "USDT",
+                "token_decimal": 18,
+                "rimplenet_backend_minimum_amount_to_process_deposit_per_request": 10,
+                "rimplenet_backend_maximum_amount_to_process_deposit_per_request": 100,
+                "rimplenet_backend_wallet_id_to_deposit_to_user_wallet": "usdt"
+            },
+            "0x24a7fa01ab2a327398f170076a1c2029e50d293b": {
+                "token_name": "Hycacoin",
+                "token_symbol": "HCC",
+                "token_decimal": 8,
+                "rimplenet_backend_minimum_amount_to_process_deposit_per_request": 10,
+                "rimplenet_backend_maximum_amount_to_process_deposit_per_request": 100,
+                "rimplenet_backend_wallet_id_to_deposit_to_user_wallet": "ngn"
+            }
+}]

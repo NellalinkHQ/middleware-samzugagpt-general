@@ -1,0 +1,18 @@
+[{
+            "0x55d398326f99059ff775485246999027b3197955": {
+                "token_name": "Tether USDT",
+                "token_symbol": "USDT",
+                "token_decimal": 18,
+                "rimplenet_backend_minimum_amount_to_process_deposit_per_request": 10,
+                "rimplenet_backend_maximum_amount_to_process_deposit_per_request": 100,
+                "rimplenet_backend_wallet_id_to_deposit_to_user_wallet": "usdt"
+            },
+            "0x702371e0897f5e2f566b1ce8256856d0549c5857": {
+                "token_name": "Zugacoin",
+                "token_symbol": "SZCB",
+                "token_decimal": 8,
+                "rimplenet_backend_minimum_amount_to_process_deposit_per_request": 10,
+                "rimplenet_backend_maximum_amount_to_process_deposit_per_request": 100,
+                "rimplenet_backend_wallet_id_to_deposit_to_user_wallet": "szcb"
+            }
+}]
