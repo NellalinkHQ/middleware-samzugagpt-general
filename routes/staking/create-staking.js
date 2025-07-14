@@ -23,7 +23,9 @@ const MODULE1_STAKING_ALLOWED_PATTERN_2_ROI_PAYMENT_WALLET_ID = process.env.MODU
 router.post('/', async function(req, res, next) {
     try {
         // Extracting data from the request body
-        const { request_id, user_id, staking_amount, wallet_id, roi_payment_interval, roi_payment_duration, roi_payment_percentage_of_staking_amount, roi_payment_pattern, roi_payment_wallet_id } = req.body;
+        const { request_id, user_id, staking_amount, wallet_id, staking_id} = req.body;
+
+        
 
         // Check if Authorization is added
         if (!req.headers.authorization) {
@@ -54,6 +56,32 @@ router.post('/', async function(req, res, next) {
                 return res.status(400).send(response);
             }
         }
+
+        //Staking Plan
+
+        let roi_payment_interval, roi_payment_duration, roi_payment_percentage_of_staking_amount, roi_payment_pattern, roi_payment_wallet_id ;
+        if(staking_id=="plan_1"){
+
+            roi_payment_percentage_of_staking_amount =  "1%"
+            roi_payment_interval = "every_second"; 
+            roi_payment_duration = "10"; // duration for stake maturity and withdrawal 
+            roi_withdrawal_interval = "every_minute"; // duration for stake maturity and withdrawal 
+            roi_payment_pattern = "internal_pattern_2";
+            roi_payment_wallet_id = "usdt";
+
+        }
+        else{
+
+            const response = {
+                status: false,
+                status_code: 400,
+                message: 'Unknown Staking Plan',
+                error: { error_data: staking_id}
+            };
+            return res.status(400).send(response); // Return response if not added
+
+        }
+
 
         // Check if roi_payment_pattern is internal_pattern_2
         if (roi_payment_pattern === "internal_pattern_2") {
@@ -88,7 +116,7 @@ router.post('/', async function(req, res, next) {
 
 
         // Check if roi_payment_duration is within allowed range
-        const allowedDurations = MODULE1_STAKING_ALLOWED_DURATION.split(',').map(duration => parseInt(duration));
+        const allowedDurations = MODULE1_STAKING_ALLOWED_DURATION.split(',');
         if (!allowedDurations.includes(roi_payment_duration)) {
             const response = {
                 status: false,
@@ -150,6 +178,7 @@ router.post('/', async function(req, res, next) {
             "note": "Staking Request",
             "meta_data": {
                 "staking_alt_request_id": `staking_locked_${request_id}`,
+                "staking_roi_withdrawal_interval": roi_withdrawal_interval,
 
                 "transaction_action_type": "staking_request",
                 "transaction_type_category": "staking",
@@ -211,6 +240,7 @@ router.post('/', async function(req, res, next) {
                 "staking_amount": staking_amount,
                 "staking_roi_payment_pattern": roi_payment_pattern,//can be internal_pattern_1 or internal_pattern_2 or external_pattern_1 or external_pattern_johndoeprovider
                
+                "staking_roi_withdrawal_interval": roi_withdrawal_interval,
 
                 "staking_roi_payment_interval": staking_roi_payment_interval,
                 "staking_roi_payment_startime_ts": staking_roi_payment_startime_ts,

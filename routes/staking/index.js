@@ -7,14 +7,17 @@ const userJWTSecurityCheck= require('../../middleware-utils/user-jwt-token-secur
 /* Create Staking */
 router.use('/', userJWTSecurityCheck, require('./create-staking'));
 
+/* Get Staking Details*/
+router.use('/', userJWTSecurityCheck, require('./get-staking'));
+
 /* Get Staking ROI History */
 router.use('/', userJWTSecurityCheck, require('./get-staking-history'));
 
+/* Withdraw Acuumulated Staking ROI */
+router.use('/withdraw-roi', userJWTSecurityCheck, require('./staking-withdraw-roi-enhanced'));
+
 /* Get Accumulated Staking ROI */
 router.use('/accumulated-roi', userJWTSecurityCheck, require('./staking-accumulated-roi'));
-
-/* Withdraw Acuumulated Staking ROI */
-router.use('/withdraw-roi', userJWTSecurityCheck, require('./staking-withdraw-roi'));
 
 /* Get Staking Total Interest Balance */
 router.use('/total-accumulated-roi', userJWTSecurityCheck, require('./staking-accumulated-roi-total-balance'));
