@@ -20,6 +20,36 @@ const MODULE1_STAKING_ALLOWED_PAYMENT_INTERVAL = process.env.MODULE1_STAKING_ALL
 const MODULE1_STAKING_ALLOWED_PAYMENT_PERCENTAGE_OF_STAKING_AMOUNT_PER_INTERVAL = process.env.MODULE1_STAKING_ALLOWED_PAYMENT_PERCENTAGE_OF_STAKING_AMOUNT_PER_INTERVAL;
 const MODULE1_STAKING_ALLOWED_PATTERN_2_ROI_PAYMENT_WALLET_ID = process.env.MODULE1_STAKING_ALLOWED_PATTERN_2_ROI_PAYMENT_WALLET_ID;
 
+const MODULE1_STAKING_PLAN_1_CAPITAL_DURATION = process.env.MODULE1_STAKING_PLAN_1_CAPITAL_DURATION;
+const MODULE1_STAKING_PLAN_1_ROI_PAYMENT_INTERVAL = process.env.MODULE1_STAKING_PLAN_1_ROI_PAYMENT_INTERVAL;
+const MODULE1_STAKING_PLAN_1_ROI_PAYMENT_DURATION = process.env.MODULE1_STAKING_PLAN_1_ROI_PAYMENT_DURATION;
+const MODULE1_STAKING_PLAN_1_ROI_PAYMENT_PERCENTAGE_OF_STAKING_AMOUNT_PER_INTERVAL = process.env.MODULE1_STAKING_PLAN_1_ROI_PAYMENT_PERCENTAGE_OF_STAKING_AMOUNT_PER_INTERVAL;
+const MODULE1_STAKING_PLAN_1_ROI_PAYMENT_PATTERN = process.env.MODULE1_STAKING_PLAN_1_ROI_PAYMENT_PATTERN;
+const MODULE1_STAKING_PLAN_1_ROI_PAYMENT_WALLET_ID = process.env.MODULE1_STAKING_PLAN_1_ROI_PAYMENT_WALLET_ID;
+const MODULE1_STAKING_PLAN_1_ROI_WITHDRAWAL_INTERVAL = process.env.MODULE1_STAKING_PLAN_1_ROI_WITHDRAWAL_INTERVAL;
+const MODULE1_STAKING_PLAN_1_ROI_WITHDRAWAL_DURATION = process.env.MODULE1_STAKING_PLAN_1_ROI_WITHDRAWAL_DURATION;
+
+const MODULE1_STAKING_PLAN_2_CAPITAL_DURATION = process.env.MODULE1_STAKING_PLAN_2_CAPITAL_DURATION;
+const MODULE1_STAKING_PLAN_2_ROI_PAYMENT_INTERVAL = process.env.MODULE1_STAKING_PLAN_2_ROI_PAYMENT_INTERVAL;
+const MODULE1_STAKING_PLAN_2_ROI_PAYMENT_DURATION = process.env.MODULE1_STAKING_PLAN_2_ROI_PAYMENT_DURATION;
+const MODULE1_STAKING_PLAN_2_ROI_PAYMENT_PERCENTAGE_OF_STAKING_AMOUNT_PER_INTERVAL = process.env.MODULE1_STAKING_PLAN_2_ROI_PAYMENT_PERCENTAGE_OF_STAKING_AMOUNT_PER_INTERVAL;
+const MODULE1_STAKING_PLAN_2_ROI_PAYMENT_PATTERN = process.env.MODULE1_STAKING_PLAN_2_ROI_PAYMENT_PATTERN;
+const MODULE1_STAKING_PLAN_2_ROI_PAYMENT_WALLET_ID = process.env.MODULE1_STAKING_PLAN_2_ROI_PAYMENT_WALLET_ID;
+const MODULE1_STAKING_PLAN_2_ROI_WITHDRAWAL_INTERVAL = process.env.MODULE1_STAKING_PLAN_2_ROI_WITHDRAWAL_INTERVAL;
+const MODULE1_STAKING_PLAN_2_ROI_WITHDRAWAL_DURATION = process.env.MODULE1_STAKING_PLAN_2_ROI_WITHDRAWAL_DURATION;  
+
+const MODULE1_STAKING_PLAN_3_CAPITAL_DURATION = process.env.MODULE1_STAKING_PLAN_3_CAPITAL_DURATION;
+const MODULE1_STAKING_PLAN_3_ROI_PAYMENT_INTERVAL = process.env.MODULE1_STAKING_PLAN_3_ROI_PAYMENT_INTERVAL;
+const MODULE1_STAKING_PLAN_3_ROI_PAYMENT_DURATION = process.env.MODULE1_STAKING_PLAN_3_ROI_PAYMENT_DURATION;
+const MODULE1_STAKING_PLAN_3_ROI_PAYMENT_PERCENTAGE_OF_STAKING_AMOUNT_PER_INTERVAL = process.env.MODULE1_STAKING_PLAN_3_ROI_PAYMENT_PERCENTAGE_OF_STAKING_AMOUNT_PER_INTERVAL;
+const MODULE1_STAKING_PLAN_3_ROI_PAYMENT_PATTERN = process.env.MODULE1_STAKING_PLAN_3_ROI_PAYMENT_PATTERN;
+const MODULE1_STAKING_PLAN_3_ROI_PAYMENT_WALLET_ID = process.env.MODULE1_STAKING_PLAN_3_ROI_PAYMENT_WALLET_ID;
+const MODULE1_STAKING_PLAN_3_ROI_WITHDRAWAL_INTERVAL = process.env.MODULE1_STAKING_PLAN_3_ROI_WITHDRAWAL_INTERVAL;
+const MODULE1_STAKING_PLAN_3_ROI_WITHDRAWAL_DURATION = process.env.MODULE1_STAKING_PLAN_3_ROI_WITHDRAWAL_DURATION;
+
+
+
+
 router.post('/', async function(req, res, next) {
     try {
         // Extracting data from the request body
@@ -62,12 +92,50 @@ router.post('/', async function(req, res, next) {
         let roi_payment_interval, roi_payment_duration, roi_payment_percentage_of_staking_amount, roi_payment_pattern, roi_payment_wallet_id ;
         if(staking_id=="plan_1"){
 
-            roi_payment_percentage_of_staking_amount =  "1%"
+            roi_payment_percentage_of_staking_amount = MODULE1_STAKING_PLAN_1_ROI_PAYMENT_PERCENTAGE_OF_STAKING_AMOUNT_PER_INTERVAL;
+            roi_payment_interval = MODULE1_STAKING_PLAN_1_ROI_PAYMENT_INTERVAL; 
+            roi_payment_duration = MODULE1_STAKING_PLAN_1_ROI_PAYMENT_DURATION; // duration for stake maturity and withdrawal 
+            roi_withdrawal_interval = MODULE1_STAKING_PLAN_1_ROI_WITHDRAWAL_INTERVAL; // duration for stake maturity and withdrawal 
+            roi_payment_wallet_id = MODULE1_STAKING_PLAN_1_ROI_PAYMENT_WALLET_ID;
+            roi_first_withdrawal_duration = MODULE1_STAKING_PLAN_1_ROI_FIRST_WITHDRAWAL_DURATION;
+            staking_capital_locked_duration = MODULE1_STAKING_PLAN_1_CAPITAL_DURATION; // 2 minutes 
+            roi_payment_pattern = MODULE1_STAKING_PLAN_1_ROI_PAYMENT_PATTERN;
+
+        }  
+        
+        else if(staking_id=="plan_2"){
+
+            roi_payment_percentage_of_staking_amount = MODULE1_STAKING_PLAN_2_ROI_PAYMENT_PERCENTAGE_OF_STAKING_AMOUNT_PER_INTERVAL;
+            roi_payment_interval = MODULE1_STAKING_PLAN_2_ROI_PAYMENT_INTERVAL; 
+            roi_payment_duration = MODULE1_STAKING_PLAN_2_ROI_PAYMENT_DURATION; // duration for stake maturity and withdrawal 
+            roi_withdrawal_interval = MODULE1_STAKING_PLAN_2_ROI_WITHDRAWAL_INTERVAL; // duration for stake maturity and withdrawal 
+            roi_first_withdrawal_duration = MODULE1_STAKING_PLAN_2_ROI_FIRST_WITHDRAWAL_DURATION;
+            staking_capital_locked_duration = MODULE1_STAKING_PLAN_2_CAPITAL_DURATION; // 5 minutes
+            roi_payment_pattern = MODULE1_STAKING_PLAN_2_ROI_PAYMENT_PATTERN;
+
+        }
+        else if(staking_id=="plan_3"){
+
+            roi_payment_percentage_of_staking_amount = MODULE1_STAKING_PLAN_3_ROI_PAYMENT_PERCENTAGE_OF_STAKING_AMOUNT_PER_INTERVAL;
+            roi_payment_interval = MODULE1_STAKING_PLAN_3_ROI_PAYMENT_INTERVAL; 
+            roi_payment_duration = MODULE1_STAKING_PLAN_3_ROI_PAYMENT_DURATION; // duration for stake maturity and withdrawal 
+            roi_withdrawal_interval = MODULE1_STAKING_PLAN_3_ROI_WITHDRAWAL_INTERVAL; // duration for stake maturity and withdrawal 
+            roi_payment_wallet_id = MODULE1_STAKING_PLAN_3_ROI_PAYMENT_WALLET_ID;
+            roi_first_withdrawal_duration = MODULE1_STAKING_PLAN_3_ROI_FIRST_WITHDRAWAL_DURATION;
+            staking_capital_locked_duration = MODULE1_STAKING_PLAN_3_CAPITAL_DURATION; // 10 minutes
+            roi_payment_pattern = MODULE1_STAKING_PLAN_3_ROI_PAYMENT_PATTERN;
+            
+
+        }
+        else if(staking_id=="plan_4"){
+
+            roi_payment_percentage_of_staking_amount =  "0.03%"
             roi_payment_interval = "every_second"; 
-            roi_payment_duration = "10"; // duration for stake maturity and withdrawal 
+            roi_payment_duration = "5"; // duration for stake maturity and withdrawal 
             roi_withdrawal_interval = "every_minute"; // duration for stake maturity and withdrawal 
             roi_payment_pattern = "internal_pattern_2";
             roi_payment_wallet_id = "usdt";
+            staking_capital_locked_duration = 10 * 60 * 1000; // 10 minutes
 
         }
         else{
@@ -219,7 +287,7 @@ router.post('/', async function(req, res, next) {
         let staking_count_number_of_roi_payment_interval_from_startime_till_endtime = roi_payment_duration;
         let staking_roi_payment_startime_ts = Math.floor(Date.now() / 1000); // Converted to seconds
         let staking_roi_payment_endtime_ts = staking_roi_payment_startime_ts + (staking_count_number_of_roi_payment_interval_from_startime_till_endtime * timestamp_interval_values[staking_roi_payment_interval].ts)
-        
+        let staking_roi_first_withdrawal_ts = staking_roi_payment_startime_ts + (roi_first_withdrawal_duration * timestamp_interval_values[staking_roi_payment_interval].ts)
         let staking_total_roi_amount_to_be_paid = staking_count_number_of_roi_payment_interval_from_startime_till_endtime * staking_roi_interval_payment_amount;
         let staking_roi_amount_remaining_to_be_paid = staking_total_roi_amount_to_be_paid;
         let staking_roi_full_payment_amount_at_end_of_contract = staking_total_roi_amount_to_be_paid;
@@ -241,6 +309,9 @@ router.post('/', async function(req, res, next) {
                 "staking_roi_payment_pattern": roi_payment_pattern,//can be internal_pattern_1 or internal_pattern_2 or external_pattern_1 or external_pattern_johndoeprovider
                
                 "staking_roi_withdrawal_interval": roi_withdrawal_interval,
+                "staking_roi_first_withdrawal_duration": staking_roi_first_withdrawal_ts,
+                "staking_capital_locked_duration": staking_capital_locked_duration,
+                "staking_capital_payment_wallet_id": `${wallet_id}`,
 
                 "staking_roi_payment_interval": staking_roi_payment_interval,
                 "staking_roi_payment_startime_ts": staking_roi_payment_startime_ts,
