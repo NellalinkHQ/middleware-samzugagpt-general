@@ -154,24 +154,7 @@ router.post('/', async function(req, res, next) {
         }
 
 
-        // Check if roi_payment_pattern is internal_pattern_2
-        if (roi_payment_pattern === "internal_pattern_2") {
-            // Check if MODULE1_STAKING_ALLOWED_PATTERN_2_ROI_PAYMENT_WALLET_ID is set and not empty
-            if (process.env.MODULE1_STAKING_ALLOWED_PATTERN_2_ROI_PAYMENT_WALLET_ID && process.env.MODULE1_STAKING_ALLOWED_PATTERN_2_ROI_PAYMENT_WALLET_ID.trim() !== '') {
-                const ALLOWED_WALLET_IDS = process.env.MODULE1_STAKING_ALLOWED_PATTERN_2_ROI_PAYMENT_WALLET_ID.split(',');
-                // Check if roi_payment_wallet_id is allowed
-                if (!ALLOWED_WALLET_IDS.includes(roi_payment_wallet_id)) {
-                    const response = {
-                        status: false,
-                        status_code: 400,
-                        message: "Invalid roi_payment_wallet_id",
-                        error: {error_data: roi_payment_wallet_id}
-                    };
-                    return res.status(400).send(response);
-                }
-            }
-        }
-
+       
 
         // Check if roi_payment_interval is within allowed range
         const allowedIntervals = MODULE1_STAKING_ALLOWED_PAYMENT_INTERVAL.split(',');
