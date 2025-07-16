@@ -112,6 +112,7 @@ router.post('/', async function(req, res, next) {
             roi_payment_interval = MODULE1_STAKING_PLAN_2_ROI_PAYMENT_INTERVAL; 
             roi_payment_duration = MODULE1_STAKING_PLAN_2_ROI_PAYMENT_DURATION; // duration for stake maturity and withdrawal 
             roi_withdrawal_interval = MODULE1_STAKING_PLAN_2_ROI_WITHDRAWAL_INTERVAL; // duration for stake maturity and withdrawal 
+            roi_payment_wallet_id = MODULE1_STAKING_PLAN_2_ROI_PAYMENT_WALLET_ID;
             roi_first_withdrawal_duration = MODULE1_STAKING_PLAN_2_ROI_FIRST_WITHDRAWAL_DURATION;
             staking_capital_locked_duration = MODULE1_STAKING_PLAN_2_CAPITAL_DURATION; // 5 minutes
             roi_payment_pattern = MODULE1_STAKING_PLAN_2_ROI_PAYMENT_PATTERN;
@@ -154,7 +155,21 @@ router.post('/', async function(req, res, next) {
         }
 
 
-       
+        // Check if MODULE1_STAKING_ALLOWED_PATTERN_2_ROI_PAYMENT_WALLET_ID is set and not empty
+        const ALLOWED_WALLET_IDS = process.env.MODULE1_STAKING_ALLOWED_PATTERN_2_ROI_PAYMENT_WALLET_ID.split(',');
+            // Check if roi_payment_wallet_id is allowed
+        if (!ALLOWED_WALLET_IDS.includes(roi_payment_wallet_id)) {
+                    const response = {
+                        status: false,
+                        status_code: 400,
+                        message: "Invalid roi_payment_wallet_id",
+                        error: {error_data: roi_payment_wallet_id}
+                    };
+                    return res.status(400).send(response);
+        }
+    
+        
+
 
         // Check if roi_payment_interval is within allowed range
         const allowedIntervals = MODULE1_STAKING_ALLOWED_PAYMENT_INTERVAL.split(',');
