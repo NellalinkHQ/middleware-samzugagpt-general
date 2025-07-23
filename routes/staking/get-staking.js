@@ -151,7 +151,8 @@ function parseAndValidateQueryParams(query) {
         count_for_provided_datetime_ts: parseInt(query.count_for_provided_datetime_ts) || Math.floor(Date.now() / 1000),
         order: (query.order || "DESC").toUpperCase(),
         include_summary: query.include_summary !== 'false',
-        include_contract_status: query.include_contract_status !== 'false'
+        include_contract_status: query.include_contract_status !== 'false',
+        include_withdrawal_eligibility: query.include_withdrawal_eligibility !== 'false'
     };
 
     // Validate parameters
@@ -260,7 +261,15 @@ function generateRoiHistoryData(stakingMetaData, stakingMetrics, queryParams) {
         }
 
         const formattedDatetime = new Date(intervalTimestamp * 1000).toLocaleString();
-        const paidAtCount = order === "ASC" ? i : (totalIntervals - i + 1);
+        // Calculate the interval label for the current entry
+        // DESC: first entry is 'Second N', next is 'Second N-1', ...
+        // ASC:  first entry is 'Second 1', next is 'Second 2', ...
+        let paidAtCount;
+        if (order === "DESC") {
+            paidAtCount = totalIntervals - (i - startInterval);
+        } else {
+            paidAtCount = i;
+        }
 
         const interestInfo = {
             staking_roi_accumulation_id: i,
@@ -292,6 +301,10 @@ function generateRoiHistoryData(stakingMetaData, stakingMetrics, queryParams) {
         roiHistoryData.sort((a, b) => a.staking_roi_accumulation_id - b.staking_roi_accumulation_id);
     } else {
         roiHistoryData.sort((a, b) => b.staking_roi_accumulation_id - a.staking_roi_accumulation_id);
+        // After sorting, update the interval label for DESC
+        roiHistoryData.forEach((entry, idx) => {
+            entry.staking_roi_accumulation_interval_paid_at = `${TIMESTAMP_INTERVAL_VALUES[staking_roi_payment_interval].name} ${totalIntervals - ((page_no - 1) * per_page) - idx}`;
+        });
     }
 
     return roiHistoryData;
@@ -326,33 +339,75 @@ function buildResponse(stakingMetaData, stakingMetrics, roiHistoryData, queryPar
     if (queryParams.include_summary) {
         const staking_roi_payment_pattern = stakingMetaData.staking_roi_payment_pattern;
         
-        let summaryData = {
-            ...stakingMetrics,
-            staking_roi_payment_interval: stakingMetaData.staking_roi_payment_interval,
-            staking_roi_payment_pattern: stakingMetaData.staking_roi_payment_pattern,
-        };
-        
+        let summaryData;
         if (staking_roi_payment_pattern === "internal_pattern_2") {
+            // For pattern_2, calculate pattern-specific metrics
+            const pattern2StakingAmount = parseFloat(stakingMetaData.staking_amount_internal_pattern_2);
+            const pattern2IntervalPayment = parseFloat(stakingMetaData.staking_roi_interval_payment_amount_internal_pattern_2);
+            const pattern2StartTime = parseInt(stakingMetaData.staking_roi_payment_startime_ts_internal_pattern_2);
+            const pattern2EndTime = parseInt(stakingMetaData.staking_roi_payment_endtime_ts_internal_pattern_2);
+            const pattern2WithdrawnSoFar = parseFloat(stakingMetaData.staking_roi_amount_withdrawn_so_far_internal_pattern_2 || 0);
+            const pattern2RemainingToBePaid = parseFloat(stakingMetaData.staking_roi_amount_remaining_to_be_paid_internal_pattern_2 || 0);
+            const pattern2RoiFullPaymentAtEnd = parseFloat(stakingMetaData.staking_roi_full_payment_amount_at_end_of_contract_internal_pattern_2 || 0);
+            const pattern2ExchangeRate = stakingMetaData.exchange_rate_at_time_of_staking_internal_pattern_2 || stakingMetaData.exchange_rate_at_time_of_staking;
+            
+            // Calculate pattern_2 specific accumulated_roi_now (should be 0 if all withdrawn)
+            const pattern2AccumulatedRoiNow = pattern2WithdrawnSoFar + pattern2RemainingToBePaid;
+            
+            // Calculate pattern_2 specific end-of-contract values
+            const pattern2AccumulatedTotalRoiAtEnd = pattern2RoiFullPaymentAtEnd;
+            const pattern2AccumulatedTotalAmountAtEnd = pattern2StakingAmount + pattern2RoiFullPaymentAtEnd;
+            
             summaryData = {
-                ...summaryData,
-                staking_amount: parseFloat(stakingMetaData.staking_amount_internal_pattern_2),
-                staking_roi_interval_payment_amount: parseFloat(stakingMetaData.staking_roi_interval_payment_amount_internal_pattern_2),
+                count_number_of_staking_payment_interval_from_startime_till_now: stakingMetrics.count_number_of_staking_payment_interval_from_startime_till_now,
+                count_number_of_staking_payment_interval_from_startime_till_provided_datetime: stakingMetrics.count_number_of_staking_payment_interval_from_startime_till_provided_datetime,
+                count_number_of_staking_payment_interval_from_startime_till_endtime: stakingMetrics.count_number_of_staking_payment_interval_from_startime_till_endtime,
+                staking_amount: pattern2StakingAmount,
+                staking_roi_interval_payment_amount: pattern2IntervalPayment,
                 staking_roi_interval_payment_percentage: stakingMetaData.staking_roi_interval_payment_percentage_internal_pattern_2,
-                staking_roi_payment_startime_ts: parseInt(stakingMetaData.staking_roi_payment_startime_ts_internal_pattern_2),
-                staking_roi_payment_endtime_ts: parseInt(stakingMetaData.staking_roi_payment_endtime_ts_internal_pattern_2),
-                staking_roi_payment_wallet_id: stakingMetaData.staking_roi_payment_wallet_id_internal_pattern_2
+                staking_roi_payment_wallet_id: stakingMetaData.staking_roi_payment_wallet_id_internal_pattern_2,
+                accumulated_roi_now: pattern2AccumulatedRoiNow,
+                accumulated_roi_user_can_withdraw_now: pattern2RemainingToBePaid,
+                accumulated_roi_user_have_already_withdraw: pattern2WithdrawnSoFar,
+                accumulated_total_roi_at_end_of_staking_contract: pattern2AccumulatedTotalRoiAtEnd,
+                accumulated_total_roi_and_capital_at_end_of_staking_contract: pattern2AccumulatedTotalAmountAtEnd,
+                staking_roi_payment_interval: stakingMetaData.staking_roi_payment_interval,
+                staking_roi_payment_pattern: stakingMetaData.staking_roi_payment_pattern,
+                exchange_rate_at_time_of_staking: pattern2ExchangeRate,
+                staking_roi_payment_startime_ts: pattern2StartTime,
+                staking_roi_payment_endtime_ts: pattern2EndTime,
+                can_user_withdraw_roi: pattern2RemainingToBePaid > 0,
+                timestamp_retrieved_at: stakingMetrics.accumulated_timestamp_retrieved_at,
+                datetime_retrieved_at: stakingMetrics.accumulated_datetime_retrieved_at
             };
         } else {
+            const normalExchangeRate = stakingMetaData.exchange_rate_at_time_of_staking;
             summaryData = {
-                ...summaryData,
+                count_number_of_staking_payment_interval_from_startime_till_now: stakingMetrics.count_number_of_staking_payment_interval_from_startime_till_now,
+                count_number_of_staking_payment_interval_from_startime_till_provided_datetime: stakingMetrics.count_number_of_staking_payment_interval_from_startime_till_provided_datetime,
+                count_number_of_staking_payment_interval_from_startime_till_endtime: stakingMetrics.count_number_of_staking_payment_interval_from_startime_till_endtime,
                 staking_amount: parseFloat(stakingMetaData.staking_amount),
                 staking_roi_interval_payment_amount: parseFloat(stakingMetaData.staking_roi_interval_payment_amount),
                 staking_roi_interval_payment_percentage: stakingMetaData.staking_roi_interval_payment_percentage,
+                staking_roi_payment_wallet_id: stakingMetaData.staking_roi_payment_wallet_id,
+                accumulated_roi_now: stakingMetrics.accumulated_roi_now,
+                accumulated_roi_user_can_withdraw_now: stakingMetrics.accumulated_roi_user_can_withdraw_now,
+                accumulated_roi_user_have_already_withdraw: stakingMetrics.accumulated_roi_user_have_already_withdraw,
+                accumulated_total_roi_at_end_of_staking_contract: stakingMetrics.accumulated_total_roi_at_end_of_staking_contract,
+                accumulated_total_roi_and_capital_at_end_of_staking_contract: stakingMetrics.accumulated_total_amount_at_end_of_staking_contract,
+                staking_roi_payment_interval: stakingMetaData.staking_roi_payment_interval,
+                staking_roi_payment_pattern: stakingMetaData.staking_roi_payment_pattern,
+                exchange_rate_at_time_of_staking: normalExchangeRate,
                 staking_roi_payment_startime_ts: parseInt(stakingMetaData.staking_roi_payment_startime_ts),
                 staking_roi_payment_endtime_ts: parseInt(stakingMetaData.staking_roi_payment_endtime_ts),
-                staking_roi_payment_wallet_id: stakingMetaData.staking_roi_payment_wallet_id
+                can_user_withdraw_roi: stakingMetrics.accumulated_roi_user_can_withdraw_now > 0,
+                timestamp_retrieved_at: stakingMetrics.accumulated_timestamp_retrieved_at,
+                datetime_retrieved_at: stakingMetrics.accumulated_datetime_retrieved_at
             };
         }
+        
+        // Remove accumulated_total_amount_now from both patterns
+        delete summaryData.accumulated_total_amount_now;
         
         response.data.summary = summaryData;
     }
@@ -364,14 +419,17 @@ function buildResponse(stakingMetaData, stakingMetrics, roiHistoryData, queryPar
         
         response.data.contract_status = {
             is_ended: isEnded,
-            remaining_seconds: remainingTime,
-            remaining_formatted: formatRemainingTime(remainingTime),
+            remaining_time_seconds: remainingTime,
+            remaining_time_formatted: formatRemainingTime(remainingTime),
             progress_percentage: calculateProgressPercentage(
                 parseInt(stakingMetaData.staking_roi_payment_startime_ts),
                 parseInt(stakingMetaData.staking_roi_payment_endtime_ts)
             )
         };
     }
+
+    // Remove withdrawal_eligibility section entirely
+    // (No code needed, just don't add it to the response)
 
     return response;
 }

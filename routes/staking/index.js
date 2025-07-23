@@ -16,6 +16,9 @@ router.use('/', userJWTSecurityCheck, require('./get-staking-history'));
 /* Withdraw Acuumulated Staking ROI */
 router.use('/withdraw-roi', userJWTSecurityCheck, require('./staking-withdraw-roi-enhanced'));
 
+/* Withdraw Staking Capital */
+router.use('/withdraw-capital', userJWTSecurityCheck, require('./staking-withdraw-capital'));
+
 /* Get Accumulated Staking ROI */
 router.use('/accumulated-roi', userJWTSecurityCheck, require('./staking-accumulated-roi'));
 

@@ -263,13 +263,23 @@ function validateWithdrawalAmount(amountToWithdraw, stakingMetrics, stakingMetaD
     }
 
     // Check against maximum withdrawable amount
-    if (amountToWithdraw > stakingMetrics.accumulated_roi_user_can_withdraw_now) {
+    let availableBalance;
+    if (staking_roi_payment_pattern === "internal_pattern_2") {
+        // For pattern_2, use the remaining amount to be paid as available balance
+        availableBalance = staking_roi_amount_remaining_to_be_paid;
+    } else {
+        // For normal pattern, use the calculated metrics
+        availableBalance = stakingMetrics.accumulated_roi_user_can_withdraw_now;
+    }
+    
+    if (amountToWithdraw > availableBalance) {
         return {
             isValid: false,
-            message: `Withdrawal amount ${amountToWithdraw} exceeds available balance ${stakingMetrics.accumulated_roi_user_can_withdraw_now}`,
+            message: `Withdrawal amount ${amountToWithdraw} exceeds available balance ${availableBalance}`,
             details: {
                 amount_to_withdraw: amountToWithdraw,
-                available_balance: stakingMetrics.accumulated_roi_user_can_withdraw_now,
+                available_balance: availableBalance,
+                pattern: staking_roi_payment_pattern,
                 recommendation: "Reduce withdrawal amount to available balance"
             }
         };
@@ -284,19 +294,6 @@ function validateWithdrawalAmount(amountToWithdraw, stakingMetrics, stakingMetaD
                 amount_to_withdraw: amountToWithdraw,
                 remaining_contract_amount: staking_roi_amount_remaining_to_be_paid,
                 recommendation: "Reduce withdrawal amount to remaining contract amount"
-            }
-        };
-    }
-
-    // Check if contract has ended
-    const isEnded = isStakingContractEnded(end_time_ts);
-    if (isEnded) {
-        return {
-            isValid: false,
-            message: `Staking contract has ended`,
-            details: {
-                contract_end_time: new Date(end_time_ts * 1000).toISOString(),
-                recommendation: "Contact support for contract completion"
             }
         };
     }
@@ -350,7 +347,8 @@ async function processWithdrawal(stakingTransactionID, request_id, user_id, amou
         staking_roi_payment_wallet_id,
         stakingTransactionID,
         staking_roi_payment_pattern,
-        stakingMetrics
+        stakingMetrics,
+        stakingMetaData
     );
 
     const roiCreditUrl = `${MODULE1_STAKING_BASE_URL}/wp-json/rimplenet/v1/credits`;
@@ -403,7 +401,15 @@ function buildUpdateStakingRequestBody(staking_roi_payment_pattern, remaining_to
 /**
  * Build ROI credit request body
  */
-function buildRoiCreditRequestBody(request_id, user_id, amount, wallet_id, stakingTransactionID, payment_pattern, stakingMetrics) {
+function buildRoiCreditRequestBody(request_id, user_id, amount, wallet_id, stakingTransactionID, payment_pattern, stakingMetrics, stakingMetaData) {
+    // Get pattern-specific withdrawn amount
+    let accumulated_roi_user_have_already_withdraw;
+    if (payment_pattern === "internal_pattern_2") {
+        accumulated_roi_user_have_already_withdraw = parseFloat(stakingMetaData.staking_roi_amount_withdrawn_so_far_internal_pattern_2 || 0);
+    } else {
+        accumulated_roi_user_have_already_withdraw = stakingMetrics.accumulated_roi_user_have_already_withdraw;
+    }
+
     return {
         "request_id": request_id,
         "user_id": user_id,
@@ -414,7 +420,7 @@ function buildRoiCreditRequestBody(request_id, user_id, amount, wallet_id, staki
             "staking_parent_transaction_id": stakingTransactionID,
             "staking_roi_payment_pattern": payment_pattern,
             "accumulated_roi_user_can_withdraw_now": stakingMetrics.accumulated_roi_user_can_withdraw_now,
-            "accumulated_roi_user_have_already_withdraw": stakingMetrics.accumulated_roi_user_have_already_withdraw,
+            "accumulated_roi_user_have_already_withdraw": accumulated_roi_user_have_already_withdraw,
             "accumulated_roi_now": stakingMetrics.accumulated_roi_now,
             "accumulated_total_amount_now": stakingMetrics.accumulated_total_amount_now,
             "accumulated_total_roi_at_end_of_staking_contract": stakingMetrics.accumulated_total_roi_at_end_of_staking_contract,

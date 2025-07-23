@@ -54,8 +54,14 @@ function calculateStakingMetrics(stakingData, providedDatetime = null) {
     const count_number_of_staking_payment_interval_from_startime_till_endtime = 
         Math.floor((staking_roi_payment_endtime_ts - staking_roi_payment_startime_ts) / intervalTs);
     // Calculate accumulated ROI
-    const accumulated_roi_now = count_number_of_staking_payment_interval_from_startime_till_now * staking_roi_interval_payment_amount;
+    let accumulated_roi_now = count_number_of_staking_payment_interval_from_startime_till_now * staking_roi_interval_payment_amount;
     const accumulated_roi_at_provided_datetime = count_number_of_staking_payment_interval_from_startime_till_provided_datetime * staking_roi_interval_payment_amount;
+    
+    // Cap accumulated ROI to never exceed the total ROI at end of contract
+    if (accumulated_roi_now > staking_roi_full_payment_amount_at_end_of_contract) {
+        accumulated_roi_now = staking_roi_full_payment_amount_at_end_of_contract;
+    }
+    
     // Calculate accumulated total amounts
     const accumulated_total_amount_now = staking_amount + accumulated_roi_now;
     const accumulated_total_amount_at_end_of_staking_contract = staking_amount + staking_roi_full_payment_amount_at_end_of_contract;
@@ -80,12 +86,12 @@ function calculateStakingMetrics(stakingData, providedDatetime = null) {
         count_number_of_staking_payment_interval_from_startime_till_now,
         count_number_of_staking_payment_interval_from_startime_till_provided_datetime,
         count_number_of_staking_payment_interval_from_startime_till_endtime,
-        accumulated_roi_user_can_withdraw_now_initial: accumulated_roi_user_can_withdraw_now,
-        accumulated_roi_user_have_already_withdraw_initial: accumulated_roi_user_have_already_withdraw,
-        accumulated_roi_now_initial: accumulated_roi_now,
-        accumulated_total_amount_now_initial: accumulated_total_amount_now,
-        accumulated_total_roi_at_end_of_staking_contract_initial: staking_roi_full_payment_amount_at_end_of_contract,
-        accumulated_total_amount_at_end_of_staking_contract_initial: accumulated_total_amount_at_end_of_staking_contract,
+        accumulated_roi_user_can_withdraw_now: accumulated_roi_user_can_withdraw_now,
+        accumulated_roi_user_have_already_withdraw: accumulated_roi_user_have_already_withdraw,
+        accumulated_roi_now: accumulated_roi_now,
+        accumulated_total_amount_now: accumulated_total_amount_now,
+        accumulated_total_roi_at_end_of_staking_contract: staking_roi_full_payment_amount_at_end_of_contract,
+        accumulated_total_amount_at_end_of_staking_contract: accumulated_total_amount_at_end_of_staking_contract,
         accumulated_timestamp_retrieved_at: currentTimestamp,
         accumulated_datetime_retrieved_at
     };
@@ -151,12 +157,12 @@ function calculateAllStakingSummariesFromMetaData(stakingMetaData, providedDatet
     // Map to clear field names for summary
     function mapSummaryFields(metrics) {
         return {
-            accumulated_roi_now: metrics.accumulated_roi_now_initial,
-            accumulated_total_amount_now: metrics.accumulated_total_amount_now_initial,
-            accumulated_roi_at_end_of_contract: metrics.accumulated_total_roi_at_end_of_staking_contract_initial,
-            accumulated_total_amount_at_end_of_contract: metrics.accumulated_total_amount_at_end_of_staking_contract_initial,
-            accumulated_roi_user_can_withdraw_now: metrics.accumulated_roi_user_can_withdraw_now_initial,
-            accumulated_roi_user_have_already_withdraw: metrics.accumulated_roi_user_have_already_withdraw_initial,
+            accumulated_roi_now: metrics.accumulated_roi_now,
+            accumulated_total_amount_now: metrics.accumulated_total_amount_now,
+            accumulated_roi_at_end_of_contract: metrics.accumulated_total_roi_at_end_of_staking_contract,
+            accumulated_total_amount_at_end_of_contract: metrics.accumulated_total_amount_at_end_of_staking_contract,
+            accumulated_roi_user_can_withdraw_now: metrics.accumulated_roi_user_can_withdraw_now,
+            accumulated_roi_user_have_already_withdraw: metrics.accumulated_roi_user_have_already_withdraw,
             count_number_of_staking_payment_interval_from_startime_till_now: metrics.count_number_of_staking_payment_interval_from_startime_till_now,
             count_number_of_staking_payment_interval_from_startime_till_endtime: metrics.count_number_of_staking_payment_interval_from_startime_till_endtime,
             accumulated_timestamp_retrieved_at: metrics.accumulated_timestamp_retrieved_at,
