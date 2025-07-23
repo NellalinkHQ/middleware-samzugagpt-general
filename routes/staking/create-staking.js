@@ -87,6 +87,15 @@ router.post('/', async function(req, res, next) {
             }
         }
 
+        const timestamp_interval_values = {
+            every_second: { ts: 1, name: "Second", name_plural: "Seconds", name_repetition: "Every Second" },
+            every_minute: { ts: 60, name: "Minute", name_plural: "Minutes", name_repetition: "Every Minute" },
+            every_hour: { ts: 3600, name: "Hour", name_plural: "Hours", name_repetition: "Every Hour" },
+            every_day: { ts: 86400, name: "Day", name_plural: "Days", name_repetition: "Daily" },
+            every_week: { ts: 604800, name: "Week", name_plural: "Weeks", name_repetition: "Weekly" },
+            every_month: { ts: 2592000, name: "Month", name_plural: "Months", name_repetition: "Monthly" },
+            every_year: { ts: 31536000, name: "Year", name_plural: "Years", name_repetition: "Yearly" }
+          };
         //Staking Plan
 
         let roi_payment_interval, roi_payment_duration, roi_payment_percentage_of_staking_amount, roi_payment_pattern, roi_payment_wallet_id ;
@@ -95,13 +104,15 @@ router.post('/', async function(req, res, next) {
             staking_plan_id = "plan_1";
             staking_plan_name = "Plan A : High-Yield Locked Staking";
 
+
             roi_payment_percentage_of_staking_amount = MODULE1_STAKING_PLAN_1_ROI_PAYMENT_PERCENTAGE_OF_STAKING_AMOUNT_PER_INTERVAL;
             roi_payment_interval = MODULE1_STAKING_PLAN_1_ROI_PAYMENT_INTERVAL; 
             roi_payment_duration = MODULE1_STAKING_PLAN_1_ROI_PAYMENT_DURATION; // duration for stake maturity and withdrawal 
             roi_withdrawal_interval = MODULE1_STAKING_PLAN_1_ROI_WITHDRAWAL_INTERVAL; // duration for stake maturity and withdrawal 
             roi_payment_wallet_id = MODULE1_STAKING_PLAN_1_ROI_PAYMENT_WALLET_ID;
             roi_first_withdrawal_duration =  MODULE1_STAKING_PLAN_1_ROI_FIRST_WITHDRAWAL_DURATION; 
-            staking_capital_locked_duration = MODULE1_STAKING_PLAN_1_CAPITAL_DURATION; // 2 minutes 
+            staking_capital_locked_duration = MODULE1_STAKING_PLAN_1_CAPITAL_DURATION; 
+            staking_capital_locked_duration_formatted_name = `${staking_capital_locked_duration} ` + timestamp_interval_values[roi_payment_interval].name_plural;
             roi_payment_pattern = MODULE1_STAKING_PLAN_1_ROI_PAYMENT_PATTERN;
 
         }  
@@ -117,7 +128,8 @@ router.post('/', async function(req, res, next) {
             roi_withdrawal_interval = MODULE1_STAKING_PLAN_2_ROI_WITHDRAWAL_INTERVAL; // duration for stake maturity and withdrawal 
             roi_payment_wallet_id = MODULE1_STAKING_PLAN_2_ROI_PAYMENT_WALLET_ID;
             roi_first_withdrawal_duration = MODULE1_STAKING_PLAN_2_ROI_FIRST_WITHDRAWAL_DURATION;
-            staking_capital_locked_duration = MODULE1_STAKING_PLAN_2_CAPITAL_DURATION; // 5 minutes
+            staking_capital_locked_duration = MODULE1_STAKING_PLAN_2_CAPITAL_DURATION; 
+            staking_capital_locked_duration_formatted_name = `${staking_capital_locked_duration} ` + timestamp_interval_values[roi_payment_interval].name_plural;
             roi_payment_pattern = MODULE1_STAKING_PLAN_2_ROI_PAYMENT_PATTERN;
 
         }
@@ -133,7 +145,8 @@ router.post('/', async function(req, res, next) {
             roi_withdrawal_interval = MODULE1_STAKING_PLAN_3_ROI_WITHDRAWAL_INTERVAL; // duration for stake maturity and withdrawal 
             roi_payment_wallet_id = MODULE1_STAKING_PLAN_3_ROI_PAYMENT_WALLET_ID;
             roi_first_withdrawal_duration = MODULE1_STAKING_PLAN_3_ROI_FIRST_WITHDRAWAL_DURATION;
-            staking_capital_locked_duration = MODULE1_STAKING_PLAN_3_CAPITAL_DURATION; // 10 minutes
+            staking_capital_locked_duration = MODULE1_STAKING_PLAN_3_CAPITAL_DURATION; 
+            staking_capital_locked_duration_formatted_name = `${staking_capital_locked_duration} ` + timestamp_interval_values[roi_payment_interval].name_plural;
             roi_payment_pattern = MODULE1_STAKING_PLAN_3_ROI_PAYMENT_PATTERN;
             
 
@@ -272,15 +285,6 @@ router.post('/', async function(req, res, next) {
         });
 
 
-        const timestamp_interval_values = {
-              every_second: { ts: 1, name: "Second", name_repetition: "Every Second" },
-              every_minute: { ts: 60, name: "Minute", name_repetition: "Every Minute" },
-              every_hour: { ts: 3600, name: "Hour", name_repetition: "Every Hour" },
-              every_day: { ts: 86400, name: "Day", name_repetition: "Daily" },
-              every_week: { ts: 604800, name: "Week", name_repetition: "Weekly" },
-              every_month: { ts: 2592000, name: "Month", name_repetition: "Monthly" },
-              every_year: { ts: 31536000, name: "Year", name_repetition: "Yearly" }
-            };
 
         let staking_roi_interval_payment_percentage = roi_payment_percentage_of_staking_amount;
         // Remove the percentage sign and convert to a number
@@ -325,6 +329,7 @@ router.post('/', async function(req, res, next) {
 
                 "staking_plan_id": staking_plan_id,
                 "staking_plan_name": staking_plan_name,
+                "staking_capital_locked_duration_formatted_name": staking_capital_locked_duration_formatted_name,
 
                 "staking_roi_payment_interval": staking_roi_payment_interval,
                 "staking_roi_payment_startime_ts": staking_roi_payment_startime_ts,
