@@ -174,6 +174,10 @@ router.post('/', async function(req, res, next) {
 
         }
 
+        if(staking_capital_locked_duration==0){
+            staking_capital_locked_duration_formatted_name = "Instant Capital Withdrawal";
+        }
+
 
         // Check if MODULE1_STAKING_ALLOWED_PATTERN_2_ROI_PAYMENT_WALLET_ID is set and not empty
         const ALLOWED_WALLET_IDS = MODULE1_STAKING_ALLOWED_PATTERN_2_ROI_PAYMENT_WALLET_ID.split(',');
