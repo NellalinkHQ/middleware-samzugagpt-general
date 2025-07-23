@@ -33,13 +33,13 @@ router.post('/:stakingTransactionID', async function(req, res, next) {
 
 
     const timestamp_interval_values = {
-      every_second: { ts: 1, name: "Second", name_repetition: "Every Second" },
-      every_minute: { ts: 60, name: "Minute", name_repetition: "Every Minute" },
-      every_hour: { ts: 3600, name: "Hour", name_repetition: "Every Hour" },
-      every_day: { ts: 86400, name: "Day", name_repetition: "Daily" },
-      every_week: { ts: 604800, name: "Week", name_repetition: "Weekly" },
-      every_month: { ts: 2592000, name: "Month", name_repetition: "Monthly" },
-      every_year: { ts: 31536000, name: "Year", name_repetition: "Yearly" }
+      every_second: { ts: 1, name: "Second", name_plural: "Seconds", name_repetition: "Every Second" },
+      every_minute: { ts: 60, name: "Minute", name_plural: "Minutes", name_repetition: "Every Minute" },
+      every_hour: { ts: 3600, name: "Hour", name_plural: "Hours", name_repetition: "Every Hour" },
+      every_day: { ts: 86400, name: "Day", name_plural: "Days", name_repetition: "Daily" },
+      every_week: { ts: 604800, name: "Week", name_plural: "Weeks", name_repetition: "Weekly" },
+      every_month: { ts: 2592000, name: "Month", name_plural: "Months", name_repetition: "Monthly" },
+      every_year: { ts: 31536000, name: "Year", name_plural: "Years", name_repetition: "Yearly" }
     };
     //set request_id format
     let roi_credit_request_id = `staking_roi_interest_payment_${request_id}`;

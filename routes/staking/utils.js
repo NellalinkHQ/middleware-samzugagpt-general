@@ -5,13 +5,13 @@
 
 // Timestamp interval values for different payment intervals
 const TIMESTAMP_INTERVAL_VALUES = {
-    every_second: { ts: 1, name: "Second", name_repetition: "Every Second" },
-    every_minute: { ts: 60, name: "Minute", name_repetition: "Every Minute" },
-    every_hour: { ts: 3600, name: "Hour", name_repetition: "Every Hour" },
-    every_day: { ts: 86400, name: "Day", name_repetition: "Daily" },
-    every_week: { ts: 604800, name: "Week", name_repetition: "Weekly" },
-    every_month: { ts: 2592000, name: "Month", name_repetition: "Monthly" },
-    every_year: { ts: 31536000, name: "Year", name_repetition: "Yearly" }
+    every_second: { ts: 1, name: "Second", name_plural: "Seconds", name_repetition: "Every Second" },
+    every_minute: { ts: 60, name: "Minute", name_plural: "Minutes", name_repetition: "Every Minute" },
+    every_hour: { ts: 3600, name: "Hour", name_plural: "Hours", name_repetition: "Every Hour" },
+    every_day: { ts: 86400, name: "Day", name_plural: "Days", name_repetition: "Daily" },
+    every_week: { ts: 604800, name: "Week", name_plural: "Weeks", name_repetition: "Weekly" },
+    every_month: { ts: 2592000, name: "Month", name_plural: "Months", name_repetition: "Monthly" },
+    every_year: { ts: 31536000, name: "Year", name_plural: "Years", name_repetition: "Yearly" }
 };
 
 /**
@@ -161,8 +161,8 @@ function calculateAllStakingSummariesFromMetaData(stakingMetaData, providedDatet
             accumulated_total_amount_now: metrics.accumulated_total_amount_now,
             accumulated_roi_at_end_of_contract: metrics.accumulated_total_roi_at_end_of_staking_contract,
             accumulated_total_amount_at_end_of_contract: metrics.accumulated_total_amount_at_end_of_staking_contract,
-            accumulated_roi_user_can_withdraw_now: metrics.accumulated_roi_user_can_withdraw_now,
-            accumulated_roi_user_have_already_withdraw: metrics.accumulated_roi_user_have_already_withdraw,
+            accumulated_roi_user_can_withdraw_now: metrics.accumulated_roi_user_can_withdraw_now_initial,
+            accumulated_roi_user_have_already_withdraw: metrics.accumulated_roi_user_have_already_withdraw_initial,
             count_number_of_staking_payment_interval_from_startime_till_now: metrics.count_number_of_staking_payment_interval_from_startime_till_now,
             count_number_of_staking_payment_interval_from_startime_till_endtime: metrics.count_number_of_staking_payment_interval_from_startime_till_endtime,
             accumulated_timestamp_retrieved_at: metrics.accumulated_timestamp_retrieved_at,
