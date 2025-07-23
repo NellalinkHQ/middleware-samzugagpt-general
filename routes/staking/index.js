@@ -10,9 +10,6 @@ router.use('/', userJWTSecurityCheck, require('./create-staking'));
 /* Get Staking Details*/
 router.use('/', userJWTSecurityCheck, require('./get-staking'));
 
-/* Get Staking ROI History */
-router.use('/', userJWTSecurityCheck, require('./get-staking-history'));
-
 /* Withdraw Acuumulated Staking ROI */
 router.use('/withdraw-roi', userJWTSecurityCheck, require('./staking-withdraw-roi-enhanced'));
 
