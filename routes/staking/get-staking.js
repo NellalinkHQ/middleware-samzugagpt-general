@@ -373,8 +373,6 @@ function buildResponse(stakingMetaData, stakingMetrics, roiHistoryData, queryPar
                 accumulated_total_roi_and_capital_at_end_of_staking_contract: pattern2AccumulatedTotalAmountAtEnd,
                 staking_roi_payment_interval: stakingMetaData.staking_roi_payment_interval,
                 staking_roi_payment_pattern: stakingMetaData.staking_roi_payment_pattern,
-                staking_amount_normal_pattern: parseFloat(stakingMetaData.staking_amount),
-                staking_roi_interval_payment_amount_normal_pattern: parseFloat(stakingMetaData.staking_roi_interval_payment_amount),
                 exchange_rate_at_time_of_staking: pattern2ExchangeRate,
                 staking_roi_payment_startime_ts: pattern2StartTime,
                 staking_roi_payment_endtime_ts: pattern2EndTime,
