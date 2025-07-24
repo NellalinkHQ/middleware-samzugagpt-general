@@ -388,7 +388,7 @@ function buildResponse(stakingMetaData, stakingMetrics, roiHistoryData, queryPar
                 staking_capital_withdraw_credit_transaction_id: stakingMetaData.staking_capital_withdraw_credit_transaction_id,
                 staking_capital_withdraw_debit_transaction_id: stakingMetaData.staking_capital_withdraw_debit_transaction_id,
                 can_user_withdraw_roi: pattern2RemainingToBePaid > 0,
-                can_user_withdraw_capital: getCanUserWithdrawCapital(stakingMetaData, pattern2EndTime),
+                can_user_withdraw_capital: getCanUserWithdrawCapital(stakingMetaData, parseInt(stakingMetaData.staking_capital_locked_duration_ts)),
                 timestamp_retrieved_at: stakingMetrics.accumulated_timestamp_retrieved_at,
                 datetime_retrieved_at: stakingMetrics.accumulated_datetime_retrieved_at
             };
@@ -422,7 +422,7 @@ function buildResponse(stakingMetaData, stakingMetrics, roiHistoryData, queryPar
                 staking_capital_withdraw_credit_transaction_id: stakingMetaData.staking_capital_withdraw_credit_transaction_id,
                 staking_capital_withdraw_debit_transaction_id: stakingMetaData.staking_capital_withdraw_debit_transaction_id,
                 can_user_withdraw_roi: stakingMetrics.accumulated_roi_user_can_withdraw_now > 0,
-                can_user_withdraw_capital: getCanUserWithdrawCapital(stakingMetaData, parseInt(stakingMetaData.staking_roi_payment_endtime_ts)),
+                can_user_withdraw_capital: getCanUserWithdrawCapital(stakingMetaData, parseInt(stakingMetaData.staking_capital_locked_duration_ts)),
                 timestamp_retrieved_at: stakingMetrics.accumulated_timestamp_retrieved_at,
                 datetime_retrieved_at: stakingMetrics.accumulated_datetime_retrieved_at
             };
@@ -458,7 +458,7 @@ function buildResponse(stakingMetaData, stakingMetrics, roiHistoryData, queryPar
                 staking_capital_withdraw_credit_transaction_id: stakingMetaData.staking_capital_withdraw_credit_transaction_id,
                 staking_capital_withdraw_debit_transaction_id: stakingMetaData.staking_capital_withdraw_debit_transaction_id,
                 can_user_withdraw_roi: stakingMetrics.accumulated_roi_user_can_withdraw_now > 0,
-                can_user_withdraw_capital: getCanUserWithdrawCapital(stakingMetaData, parseInt(stakingMetaData.staking_roi_payment_endtime_ts)),
+                can_user_withdraw_capital: getCanUserWithdrawCapital(stakingMetaData, parseInt(stakingMetaData.staking_capital_locked_duration_ts)),
                 timestamp_retrieved_at: stakingMetrics.accumulated_timestamp_retrieved_at,
                 datetime_retrieved_at: stakingMetrics.accumulated_datetime_retrieved_at
             };
