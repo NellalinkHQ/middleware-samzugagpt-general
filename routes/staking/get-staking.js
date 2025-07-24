@@ -381,7 +381,14 @@ function buildResponse(stakingMetaData, stakingMetrics, roiHistoryData, queryPar
                 exchange_rate_at_time_of_staking: pattern2ExchangeRate,
                 staking_roi_payment_startime_ts: pattern2StartTime,
                 staking_roi_payment_endtime_ts: pattern2EndTime,
+                staking_roi_next_withdrawal_duration_ts: stakingMetaData.staking_roi_next_withdrawal_duration_ts,
+                staking_roi_last_withdrawal_ts: stakingMetaData.staking_roi_last_withdrawal_ts,
+                staking_capital_withdrawal_duration_ts: pattern2EndTime,
+                staking_capital_withdrawn_at: stakingMetaData.staking_capital_withdrawn_at,
+                staking_capital_withdraw_credit_transaction_id: stakingMetaData.staking_capital_withdraw_credit_transaction_id,
+                staking_capital_withdraw_debit_transaction_id: stakingMetaData.staking_capital_withdraw_debit_transaction_id,
                 can_user_withdraw_roi: pattern2RemainingToBePaid > 0,
+                can_user_withdraw_capital: getCanUserWithdrawCapital(stakingMetaData, pattern2EndTime),
                 timestamp_retrieved_at: stakingMetrics.accumulated_timestamp_retrieved_at,
                 datetime_retrieved_at: stakingMetrics.accumulated_datetime_retrieved_at
             };
@@ -408,7 +415,14 @@ function buildResponse(stakingMetaData, stakingMetrics, roiHistoryData, queryPar
                 exchange_rate_at_time_of_staking: stakingMetaData.exchange_rate_at_time_of_staking,
                 staking_roi_payment_startime_ts: parseInt(stakingMetaData.staking_roi_payment_startime_ts),
                 staking_roi_payment_endtime_ts: parseInt(stakingMetaData.staking_roi_payment_endtime_ts),
+                staking_roi_next_withdrawal_duration_ts: stakingMetaData.staking_roi_next_withdrawal_duration_ts,
+                staking_roi_last_withdrawal_ts: stakingMetaData.staking_roi_last_withdrawal_ts,
+                staking_capital_withdrawal_duration_ts: parseInt(stakingMetaData.staking_roi_payment_endtime_ts),
+                staking_capital_withdrawn_at: stakingMetaData.staking_capital_withdrawn_at,
+                staking_capital_withdraw_credit_transaction_id: stakingMetaData.staking_capital_withdraw_credit_transaction_id,
+                staking_capital_withdraw_debit_transaction_id: stakingMetaData.staking_capital_withdraw_debit_transaction_id,
                 can_user_withdraw_roi: stakingMetrics.accumulated_roi_user_can_withdraw_now > 0,
+                can_user_withdraw_capital: getCanUserWithdrawCapital(stakingMetaData, parseInt(stakingMetaData.staking_roi_payment_endtime_ts)),
                 timestamp_retrieved_at: stakingMetrics.accumulated_timestamp_retrieved_at,
                 datetime_retrieved_at: stakingMetrics.accumulated_datetime_retrieved_at
             };
@@ -437,7 +451,14 @@ function buildResponse(stakingMetaData, stakingMetrics, roiHistoryData, queryPar
                 exchange_rate_at_time_of_staking: normalExchangeRate,
                 staking_roi_payment_startime_ts: parseInt(stakingMetaData.staking_roi_payment_startime_ts),
                 staking_roi_payment_endtime_ts: parseInt(stakingMetaData.staking_roi_payment_endtime_ts),
+                staking_roi_next_withdrawal_duration_ts: stakingMetaData.staking_roi_next_withdrawal_duration_ts,
+                staking_roi_last_withdrawal_ts: stakingMetaData.staking_roi_last_withdrawal_ts,
+                staking_capital_withdrawal_duration_ts: parseInt(stakingMetaData.staking_roi_payment_endtime_ts),
+                staking_capital_withdrawn_at: stakingMetaData.staking_capital_withdrawn_at,
+                staking_capital_withdraw_credit_transaction_id: stakingMetaData.staking_capital_withdraw_credit_transaction_id,
+                staking_capital_withdraw_debit_transaction_id: stakingMetaData.staking_capital_withdraw_debit_transaction_id,
                 can_user_withdraw_roi: stakingMetrics.accumulated_roi_user_can_withdraw_now > 0,
+                can_user_withdraw_capital: getCanUserWithdrawCapital(stakingMetaData, parseInt(stakingMetaData.staking_roi_payment_endtime_ts)),
                 timestamp_retrieved_at: stakingMetrics.accumulated_timestamp_retrieved_at,
                 datetime_retrieved_at: stakingMetrics.accumulated_datetime_retrieved_at
             };
@@ -504,6 +525,14 @@ function calculateProgressPercentage(startTime, endTime) {
     if (elapsed >= totalDuration) return 100;
     
     return Math.round((elapsed / totalDuration) * 100);
+}
+
+// Helper to determine if user can withdraw capital
+function getCanUserWithdrawCapital(stakingMetaData, contractEndTime) {
+    if (stakingMetaData.staking_capital_withdrawn && stakingMetaData.staking_capital_withdrawn.toString().toLowerCase() === 'yes') {
+        return false;
+    }
+    return Math.floor(Date.now() / 1000) >= contractEndTime;
 }
 
 module.exports = router; 
