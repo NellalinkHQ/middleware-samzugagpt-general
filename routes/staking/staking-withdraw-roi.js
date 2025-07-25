@@ -325,26 +325,46 @@ async function processWithdrawal(stakingTransactionID, request_id, user_id, amou
     const staking_roi_payment_pattern = stakingMetaData.staking_roi_payment_pattern;
     
     // Get pattern-specific wallet ID and amounts
-    let staking_roi_payment_wallet_id, staking_roi_amount_remaining_to_be_paid, staking_roi_amount_withdrawn_so_far;
+    let staking_roi_payment_wallet_id, staking_roi_amount_remaining_to_be_paid, staking_roi_amount_withdrawn_so_far, roi_withdrawal_interval;
     
     if (staking_roi_payment_pattern === "internal_pattern_2") {
         staking_roi_payment_wallet_id = stakingMetaData.staking_roi_payment_wallet_id_internal_pattern_2;
         staking_roi_amount_remaining_to_be_paid = parseFloat(stakingMetaData.staking_roi_amount_remaining_to_be_paid_internal_pattern_2 || 0);
         staking_roi_amount_withdrawn_so_far = parseFloat(stakingMetaData.staking_roi_amount_withdrawn_so_far_internal_pattern_2 || 0);
+        roi_withdrawal_interval = stakingMetaData.staking_roi_withdrawal_interval_internal_pattern_2 || stakingMetaData.staking_roi_withdrawal_interval;
     } else {
         staking_roi_payment_wallet_id = stakingMetaData.staking_roi_payment_wallet_id;
         staking_roi_amount_remaining_to_be_paid = parseFloat(stakingMetaData.staking_roi_amount_remaining_to_be_paid || 0);
         staking_roi_amount_withdrawn_so_far = parseFloat(stakingMetaData.staking_roi_amount_withdrawn_so_far || 0);
+        roi_withdrawal_interval = stakingMetaData.staking_roi_withdrawal_interval;
     }
     
     const staking_roi_amount_remaining_to_be_paid_new = staking_roi_amount_remaining_to_be_paid - amountToWithdraw;
     const staking_roi_amount_withdrawn_so_far_new = staking_roi_amount_withdrawn_so_far + amountToWithdraw;
 
+    // Calculate next eligible withdrawal time
+    const now = Math.floor(Date.now() / 1000);
+    const timestamp_interval_values = {
+        every_second: { ts: 1 },
+        every_minute: { ts: 60 },
+        every_hour: { ts: 3600 },
+        every_day: { ts: 86400 },
+        every_week: { ts: 604800 },
+        every_month: { ts: 2592000 },
+        every_year: { ts: 31536000 }
+    };
+    const intervalObj = timestamp_interval_values[roi_withdrawal_interval];
+    let next_withdrawal_ts = now;
+    if (intervalObj) {
+        next_withdrawal_ts = now + intervalObj.ts;
+    }
+
     // Update staking transaction
     const updateStakingRequestBody = buildUpdateStakingRequestBody(
         staking_roi_payment_pattern,
         staking_roi_amount_remaining_to_be_paid_new,
-        staking_roi_amount_withdrawn_so_far_new
+        staking_roi_amount_withdrawn_so_far_new,
+        next_withdrawal_ts
     );
 
     const stakingMetaUrl = `${MODULE1_STAKING_BASE_URL}/wp-json/nellalink/v2/smart-meta-manager/content/${stakingTransactionID}`;
@@ -398,17 +418,16 @@ async function processWithdrawal(stakingTransactionID, request_id, user_id, amou
 /**
  * Build update staking request body
  */
-function buildUpdateStakingRequestBody(staking_roi_payment_pattern, remaining_to_be_paid_new, withdrawn_so_far_new) {
+function buildUpdateStakingRequestBody(staking_roi_payment_pattern, remaining_to_be_paid_new, withdrawn_so_far_new, next_withdrawal_ts) {
     if (staking_roi_payment_pattern === "internal_pattern_2") {
         return {
             "staking_roi_amount_remaining_to_be_paid_internal_pattern_2": remaining_to_be_paid_new,
             "staking_roi_amount_withdrawn_so_far_internal_pattern_2": withdrawn_so_far_new,
-            "update_staking_request_timestamp": Math.floor(Date.now() / 1000)
-        };
-    } else {
-        return {
+            "staking_roi_next_withdrawal_duration_ts": next_withdrawal_ts,
+            "update_staking_request_timestamp": Math.floor(Date.now() / 1000),
             "staking_roi_amount_remaining_to_be_paid": remaining_to_be_paid_new,
             "staking_roi_amount_withdrawn_so_far": withdrawn_so_far_new,
+            "staking_roi_next_withdrawal_duration_ts": next_withdrawal_ts,
             "update_staking_request_timestamp": Math.floor(Date.now() / 1000)
         };
     }
