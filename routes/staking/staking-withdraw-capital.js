@@ -1,6 +1,7 @@
 const express = require('express');
 const axios = require('axios');
 const router = express.Router();
+const { formatRemainingTime } = require('./utils');
 
 const MODULE1_STAKING_BASE_URL = process.env.MODULE1_STAKING_BASE_URL;
 const MODULE1_STAKING_API_KEY = process.env.MODULE1_STAKING_API_KEY;
@@ -35,28 +36,12 @@ router.post('/:stakingTransactionID', async (req, res) => {
         // Extract required fields
         const staking_capital_locked_duration_ts = parseInt(stakingMeta.staking_capital_locked_duration_ts);
         const staking_capital_payment_wallet_id = stakingMeta.staking_capital_payment_wallet_id;
-        const staking_amount = parseFloat(stakingMeta.amount);
+        const staking_amount = parseFloat(stakingMeta.staking_amount_internal_pattern_2);
         const user_id = stakingMeta.user_id;
         const staking_locked_wallet_id = stakingMeta.staking_capital_locked_wallet_id || `${staking_capital_payment_wallet_id}_staking_locked`;
 
         // Check if capital lock duration is due
         const now = Math.floor(Date.now() / 1000);
-        // Helper to format remaining seconds as human-readable string
-        function formatRemainingTime(seconds) {
-            if (seconds <= 0) return 'Expired';
-            const days = Math.floor(seconds / 86400);
-            seconds %= 86400;
-            const hours = Math.floor(seconds / 3600);
-            seconds %= 3600;
-            const minutes = Math.floor(seconds / 60);
-            seconds = Math.floor(seconds % 60);
-            let parts = [];
-            if (days > 0) parts.push(`${days} day${days !== 1 ? 's' : ''}`);
-            if (hours > 0) parts.push(`${hours} hour${hours !== 1 ? 's' : ''}`);
-            if (minutes > 0) parts.push(`${minutes} minute${minutes !== 1 ? 's' : ''}`);
-            if (seconds > 0) parts.push(`${seconds} second${seconds !== 1 ? 's' : ''}`);
-            return parts.length > 0 ? parts.join(', ') : '0 seconds';
-        }
         if (now < staking_capital_locked_duration_ts) {
             const remainingSeconds = staking_capital_locked_duration_ts - now;
             return res.status(400).json({
@@ -67,6 +52,8 @@ router.post('/:stakingTransactionID', async (req, res) => {
                     staking_transaction_id : stakingTransactionID,
                     staking_capital_locked_duration_ts,
                     current_timestamp: now,
+                    current_time_formatted: new Date(now * 1000).toLocaleString(),
+                    capital_withdrawal_time_formatted: new Date(staking_capital_locked_duration_ts * 1000).toLocaleString(),
                     remaining_time_seconds: remainingSeconds,
                     remaining_time_formatted: formatRemainingTime(remainingSeconds)
                 }

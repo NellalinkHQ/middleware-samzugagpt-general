@@ -9,7 +9,9 @@ const {
     calculateStakingMetricsFromMetaData, 
     validateStakingData,
     isStakingContractEnded,
-    getRemainingStakingTime
+    getRemainingStakingTime,
+    TIMESTAMP_INTERVAL_VALUES,
+    formatRemainingTime
 } = require('./utils');
 
 const MODULE1_STAKING_BASE_URL = process.env.MODULE1_STAKING_BASE_URL;
@@ -32,20 +34,20 @@ const CACHE_TTL = 30000; // 30 seconds cache
  */
 router.post('/:stakingTransactionID', async function(req, res, next) {
     try {
-        const stakingTransactionID = req.params.stakingTransactionID;
-        const { request_id, user_id, amount_to_withdraw } = req.body;
+    const stakingTransactionID = req.params.stakingTransactionID;
+    const { request_id, user_id, amount_to_withdraw } = req.body;   
 
         // Validate authorization
-        if (!req.headers.authorization) {
+    if (!req.headers.authorization) {
             return res.status(400).send({
-                status: false,
-                status_code: 400,
-                message: 'JWT Token required',
-                error: { error_data: req.headers.authorization }
+            status: false,
+            status_code: 400,
+            message: 'JWT Token required',
+            error: { error_data: req.headers.authorization }
             });
-        }
-
-        const userBearerJWToken = req.headers.authorization.split(' ')[1];
+    }
+    
+    const userBearerJWToken = req.headers.authorization.split(' ')[1];
 
         // Validate request body
         const validationResult = validateWithdrawalRequest(req.body);
@@ -84,14 +86,18 @@ router.post('/:stakingTransactionID', async function(req, res, next) {
         const staking_roi_next_withdrawal_duration_ts = parseInt(stakingMetaData.staking_roi_next_withdrawal_duration_ts);
         const now = Math.floor(Date.now() / 1000);
         if (now < staking_roi_next_withdrawal_duration_ts) {
+            const remainingSeconds = staking_roi_next_withdrawal_duration_ts - now;
             return res.status(400).send({
                 status: false,
                 status_code: 400,
                 message: `You cannot withdraw ROI before the next eligible withdrawal time`,
                 error: {
-                    current_time: now,
-                    next_withdrawal_time: staking_roi_next_withdrawal_duration_ts,
-                    next_withdrawal_time_formatted: new Date(staking_roi_next_withdrawal_duration_ts * 1000).toLocaleString()
+                    current_timestamp: now,
+                    current_time_formatted: new Date(now * 1000).toLocaleString(),
+                    next_withdrawal_timestamp: staking_roi_next_withdrawal_duration_ts,
+                    next_withdrawal_time_formatted: new Date(staking_roi_next_withdrawal_duration_ts * 1000).toLocaleString(),
+                    remaining_time_seconds: remainingSeconds,
+                    remaining_time_formatted: formatRemainingTime(remainingSeconds)
                 }
             });
         }
@@ -127,8 +133,8 @@ router.post('/:stakingTransactionID', async function(req, res, next) {
 
         if (!withdrawalValidation.isValid) {
             return res.status(400).send({
-                status: false,
-                status_code: 400,
+            status: false,
+            status_code: 400,
                 message: withdrawalValidation.message,
                 error: withdrawalValidation.details
             });
@@ -344,16 +350,7 @@ async function processWithdrawal(stakingTransactionID, request_id, user_id, amou
 
     // Calculate next eligible withdrawal time
     const now = Math.floor(Date.now() / 1000);
-    const timestamp_interval_values = {
-        every_second: { ts: 1 },
-        every_minute: { ts: 60 },
-        every_hour: { ts: 3600 },
-        every_day: { ts: 86400 },
-        every_week: { ts: 604800 },
-        every_month: { ts: 2592000 },
-        every_year: { ts: 31536000 }
-    };
-    const intervalObj = timestamp_interval_values[roi_withdrawal_interval];
+    const intervalObj = TIMESTAMP_INTERVAL_VALUES[roi_withdrawal_interval];
     let next_withdrawal_ts = now;
     if (intervalObj) {
         next_withdrawal_ts = now + intervalObj.ts;
@@ -374,7 +371,7 @@ async function processWithdrawal(stakingTransactionID, request_id, user_id, amou
             'x-api-key': MODULE1_STAKING_API_KEY
         }
     });
-
+    
     // Credit user wallet
     const roiCreditRequestBody = buildRoiCreditRequestBody(
         roi_credit_request_id,
@@ -447,28 +444,28 @@ function buildRoiCreditRequestBody(request_id, user_id, amount, wallet_id, staki
 
     return {
         "request_id": request_id,
-        "user_id": user_id,
+            "user_id": user_id,
         "amount": amount,
         "wallet_id": wallet_id,
         "note": "Staking ROI Interest Withdrawal",
-        "meta_data": {
-            "staking_parent_transaction_id": stakingTransactionID,
+            "meta_data": {
+                "staking_parent_transaction_id": stakingTransactionID,
             "staking_roi_payment_pattern": payment_pattern,
             "accumulated_roi_user_can_withdraw_now": stakingMetrics.accumulated_roi_user_can_withdraw_now,
-            "accumulated_roi_user_have_already_withdraw": accumulated_roi_user_have_already_withdraw,
+                "accumulated_roi_user_have_already_withdraw": accumulated_roi_user_have_already_withdraw,
             "accumulated_roi_now": stakingMetrics.accumulated_roi_now,
             "accumulated_total_amount_now": stakingMetrics.accumulated_total_amount_now,
             "accumulated_total_roi_at_end_of_staking_contract": stakingMetrics.accumulated_total_roi_at_end_of_staking_contract,
             "accumulated_total_amount_at_end_of_staking_contract": stakingMetrics.accumulated_total_amount_at_end_of_staking_contract,
             "accumulated_timestamp_retrieved_at": stakingMetrics.accumulated_timestamp_retrieved_at,
             "accumulated_datetime_retrieved_at": stakingMetrics.accumulated_datetime_retrieved_at,
-            "transaction_action_type": "staking_roi_interest_payment",
-            "transaction_type_category": "staking",
-            "transaction_external_processor": "middleware1",
-            "transaction_approval_status": "user_middleware_processed",
-            "transaction_approval_method": "middleware"
-        }
-    };
+                "transaction_action_type": "staking_roi_interest_payment",
+                "transaction_type_category": "staking",
+                "transaction_external_processor": "middleware1",
+                "transaction_approval_status": "user_middleware_processed",
+                "transaction_approval_method": "middleware"
+            }
+        };
 }
 
 /**
@@ -476,10 +473,10 @@ function buildRoiCreditRequestBody(request_id, user_id, amount, wallet_id, staki
  */
 function buildAddMetaRequestBody(request_id, txn_payment_id, roi_credit_request_id, amount) {
     return {
-        [`staking_roi_payment_request_${request_id}`]: txn_payment_id,
+                [`staking_roi_payment_request_${request_id}`]: txn_payment_id,
         "staking_roi_payment_transaction_id": txn_payment_id,
-        [`staking_roi_payment_transaction_id_payment_time_${txn_payment_id}`]: Math.floor(Date.now() / 1000),
-        [`staking_roi_payment_request_id_${txn_payment_id}`]: roi_credit_request_id,
+                [`staking_roi_payment_transaction_id_payment_time_${txn_payment_id}`]: Math.floor(Date.now() / 1000),
+                [`staking_roi_payment_request_id_${txn_payment_id}`]: roi_credit_request_id,
         [`staking_roi_payment_amount_${txn_payment_id}`]: amount,
         "staking_roi_payment_transaction_id_payment_time": Math.floor(Date.now() / 1000),
         "staking_roi_payment_request_id": roi_credit_request_id,
@@ -487,4 +484,4 @@ function buildAddMetaRequestBody(request_id, txn_payment_id, roi_credit_request_
     };
 }
 
-module.exports = router; 
+module.exports = router;
