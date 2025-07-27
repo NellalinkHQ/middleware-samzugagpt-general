@@ -487,10 +487,22 @@ function calculateProgressPercentage(startTime, endTime) {
 
 // Helper to determine if user can withdraw capital
 function getCanUserWithdrawCapital(stakingMetaData, contractEndTime) {
+    // If capital has already been withdrawn, return false
     if (stakingMetaData.staking_capital_withdrawn && stakingMetaData.staking_capital_withdrawn.toString().toLowerCase() === 'yes') {
         return false;
     }
-    return Math.floor(Date.now() / 1000) >= contractEndTime;
+    
+    // Check if capital lock duration timestamp is 0 or current time (instant withdrawal)
+    const staking_capital_locked_duration_ts = parseInt(stakingMetaData.staking_capital_locked_duration_ts || 0);
+    const now = Math.floor(Date.now() / 1000);
+    
+    // If lock duration timestamp is 0 or current time, allow instant withdrawal
+    if (staking_capital_locked_duration_ts === 0 || staking_capital_locked_duration_ts <= now) {
+        return true;
+    }
+    
+    // For plans with lock duration, check if the duration has passed
+    return now >= staking_capital_locked_duration_ts;
 }
 
 module.exports = router; 

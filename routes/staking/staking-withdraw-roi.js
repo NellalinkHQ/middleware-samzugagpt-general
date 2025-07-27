@@ -5,8 +5,9 @@ var router = express.Router();
 const { handleTryCatchError } = require('../../middleware-utils/custom-try-catch-error');
 
 // Import the new utils
-const { 
-    calculateStakingMetricsFromMetaData, 
+const {
+    calculateStakingMetrics,
+    calculateStakingMetricsFromMetaData,
     validateStakingData,
     isStakingContractEnded,
     getRemainingStakingTime,
@@ -82,8 +83,24 @@ router.post('/:stakingTransactionID', async function(req, res, next) {
             });
         }
 
-        // Calculate staking metrics using utils
-        const stakingMetrics = calculateStakingMetricsFromMetaData(stakingMetaData);
+        // Calculate staking metrics using utils - use pattern-specific calculation
+        let stakingMetrics;
+        if (stakingMetaData.staking_roi_payment_pattern === "internal_pattern_2") {
+            // For pattern_2, calculate using pattern-specific fields
+            stakingMetrics = calculateStakingMetrics({
+                staking_amount: parseFloat(stakingMetaData.staking_amount_internal_pattern_2),
+                staking_roi_interval_payment_amount: parseFloat(stakingMetaData.staking_roi_interval_payment_amount_internal_pattern_2),
+                staking_roi_payment_interval: stakingMetaData.staking_roi_payment_interval,
+                staking_roi_payment_startime_ts: parseInt(stakingMetaData.staking_roi_payment_startime_ts_internal_pattern_2),
+                staking_roi_payment_endtime_ts: parseInt(stakingMetaData.staking_roi_payment_endtime_ts_internal_pattern_2),
+                staking_last_withdrawal_ts: parseInt(stakingMetaData.staking_roi_last_withdrawal_ts_internal_pattern_2) || 0,
+                staking_roi_full_payment_amount_at_end_of_contract: parseFloat(stakingMetaData.staking_roi_full_payment_amount_at_end_of_contract_internal_pattern_2),
+                staking_roi_amount_withdrawn_so_far: parseFloat(stakingMetaData.staking_roi_amount_withdrawn_so_far_internal_pattern_2 || 0)
+            });
+        } else {
+            // For normal pattern, use the standard calculation
+            stakingMetrics = calculateStakingMetricsFromMetaData(stakingMetaData);
+        }
         
         // Validate staking data
         const stakingValidation = validateStakingData({
@@ -285,14 +302,8 @@ function validateWithdrawalAmount(amountToWithdraw, stakingMetrics, stakingMetaD
     }
 
     // Check against maximum withdrawable amount
-    let availableBalance;
-    if (staking_roi_payment_pattern === "internal_pattern_2") {
-        // For pattern_2, use the remaining amount to be paid as available balance
-        availableBalance = staking_roi_amount_remaining_to_be_paid;
-    } else {
-        // For normal pattern, use the calculated metrics
-        availableBalance = stakingMetrics.accumulated_roi_user_can_withdraw_now;
-    }
+    // Use the calculated metrics which are now pattern-specific
+    const availableBalance = stakingMetrics.accumulated_roi_user_can_withdraw_now;
     
     if (amountToWithdraw > availableBalance) {
         return {
@@ -303,19 +314,6 @@ function validateWithdrawalAmount(amountToWithdraw, stakingMetrics, stakingMetaD
                 available_balance: availableBalance,
                 pattern: staking_roi_payment_pattern,
                 recommendation: "Reduce withdrawal amount to available balance"
-            }
-        };
-    }
-
-    // Check against remaining amount to be paid
-    if (amountToWithdraw > staking_roi_amount_remaining_to_be_paid) {
-        return {
-            isValid: false,
-            message: `Withdrawal amount exceeds remaining contract amount`,
-            details: {
-                amount_to_withdraw: amountToWithdraw,
-                remaining_contract_amount: staking_roi_amount_remaining_to_be_paid,
-                recommendation: "Reduce withdrawal amount to remaining contract amount"
             }
         };
     }
