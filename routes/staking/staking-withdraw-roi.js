@@ -82,26 +82,6 @@ router.post('/:stakingTransactionID', async function(req, res, next) {
             });
         }
 
-        // Check if current time is at or after staking_roi_next_withdrawal_duration_ts
-        const staking_roi_next_withdrawal_duration_ts = parseInt(stakingMetaData.staking_roi_next_withdrawal_duration_ts);
-        const now = Math.floor(Date.now() / 1000);
-        if (now < staking_roi_next_withdrawal_duration_ts) {
-            const remainingSeconds = staking_roi_next_withdrawal_duration_ts - now;
-            return res.status(400).send({
-                status: false,
-                status_code: 400,
-                message: `You cannot withdraw ROI before the next eligible withdrawal time`,
-                error: {
-                    current_timestamp: now,
-                    current_time_formatted: new Date(now * 1000).toLocaleString(),
-                    next_withdrawal_timestamp: staking_roi_next_withdrawal_duration_ts,
-                    next_withdrawal_time_formatted: new Date(staking_roi_next_withdrawal_duration_ts * 1000).toLocaleString(),
-                    remaining_time_seconds: remainingSeconds,
-                    remaining_time_formatted: formatRemainingTime(remainingSeconds)
-                }
-            });
-        }
-
         // Calculate staking metrics using utils
         const stakingMetrics = calculateStakingMetricsFromMetaData(stakingMetaData);
         
@@ -140,6 +120,26 @@ router.post('/:stakingTransactionID', async function(req, res, next) {
             });
         }
 
+        // Check if current time is at or after staking_roi_next_withdrawal_duration_ts
+        const staking_roi_next_withdrawal_duration_ts = parseInt(stakingMetaData.staking_roi_next_withdrawal_duration_ts);
+        const now = Math.floor(Date.now() / 1000);
+        if (now < staking_roi_next_withdrawal_duration_ts) {
+            const remainingSeconds = staking_roi_next_withdrawal_duration_ts - now;
+            return res.status(400).send({
+                status: false,
+                status_code: 400,
+                message: `You cannot withdraw ROI before the next eligible withdrawal time`,
+                error: {
+                    current_timestamp: now,
+                    current_time_formatted: new Date(now * 1000).toLocaleString(),
+                    next_withdrawal_timestamp: staking_roi_next_withdrawal_duration_ts,
+                    next_withdrawal_time_formatted: new Date(staking_roi_next_withdrawal_duration_ts * 1000).toLocaleString(),
+                    remaining_time_seconds: remainingSeconds,
+                    remaining_time_formatted: formatRemainingTime(remainingSeconds)
+                }
+            });
+        }
+
         // Process withdrawal
         const withdrawalResult = await processWithdrawal(
             stakingTransactionID,
@@ -172,7 +172,7 @@ router.post('/:stakingTransactionID', async function(req, res, next) {
         res.send(response);
 
     } catch (error) {
-        console.error('Error in staking-withdraw-roi-enhanced:', error);
+        console.error('Error in staking-withdraw-roi:', error);
         handleTryCatchError(res, error);
     }
 });

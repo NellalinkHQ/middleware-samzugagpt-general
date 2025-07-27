@@ -36,7 +36,7 @@ router.post('/:stakingTransactionID', async (req, res) => {
         // Extract required fields
         const staking_capital_locked_duration_ts = parseInt(stakingMeta.staking_capital_locked_duration_ts);
         const staking_capital_payment_wallet_id = stakingMeta.staking_capital_payment_wallet_id;
-        const staking_amount = parseFloat(stakingMeta.staking_amount_internal_pattern_2);
+        const staking_amount = parseFloat(stakingMeta.amount);
         const user_id = stakingMeta.user_id;
         const staking_locked_wallet_id = stakingMeta.staking_capital_locked_wallet_id || `${staking_capital_payment_wallet_id}_staking_locked`;
 
@@ -152,6 +152,8 @@ router.post('/:stakingTransactionID', async (req, res) => {
         const updateMetaBody = {
             staking_capital_withdrawn: 'yes',
             staking_capital_withdrawn_at: Math.floor(Date.now() / 1000),
+            staking_roi_payment_endtime_ts: Math.floor(Date.now() / 1000),
+            staking_roi_payment_endtime_ts_internal_pattern_2: Math.floor(Date.now() / 1000),
             staking_capital_withdraw_debit_transaction_id: debitTxnId,
             staking_capital_withdraw_credit_transaction_id: creditTxnId
         };
