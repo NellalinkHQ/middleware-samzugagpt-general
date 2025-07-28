@@ -24,8 +24,8 @@ jobs:
     - name: 📂 Sync Files to Middey
       uses: SamKirkland/FTP-Deploy-Action@4.3.0
       with:
-        server:   samzugagpt-v2.ftp.evennode.com
-        username: samzugagpt-v2_dd325
+        server:   samzugagpt-middleware-general.ftp.evennode.com
+        username: samzugagpt-middleware-general_4ad43
         password: ${{ secrets.GIT_FTP_AUTODEPLOY_PASSWORD }}
         port: 21
         protocol: ftp
