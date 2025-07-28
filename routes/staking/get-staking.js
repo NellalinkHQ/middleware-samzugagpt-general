@@ -251,12 +251,16 @@ function generateRoiHistoryData(stakingMetaData, stakingMetrics, queryParams) {
     const endInterval = Math.min(startInterval + adjustedPerPage - 1, totalIntervals);
 
     const roiHistoryData = [];
-
+    const now = Math.floor(Date.now() / 1000);
+    
+    // Calculate how many intervals have actually passed
+    const elapsedIntervals = Math.floor((now - staking_roi_payment_startime_ts) / intervalTs);
+    
     for (let i = startInterval; i <= endInterval; i++) {
         const intervalTimestamp = staking_roi_payment_startime_ts + ((i - 1) * intervalTs);
         
-        // Skip if this interval is in the future
-        if (intervalTimestamp > Math.floor(Date.now() / 1000)) {
+        // Skip if this interval is in the future or hasn't passed yet
+        if (intervalTimestamp > now || i > elapsedIntervals) {
             break;
         }
 
@@ -301,9 +305,9 @@ function generateRoiHistoryData(stakingMetaData, stakingMetrics, queryParams) {
         roiHistoryData.sort((a, b) => a.staking_roi_accumulation_id - b.staking_roi_accumulation_id);
     } else {
         roiHistoryData.sort((a, b) => b.staking_roi_accumulation_id - a.staking_roi_accumulation_id);
-        // After sorting, update the interval label for DESC
+        // After sorting, update the interval label for DESC using actual elapsed intervals
         roiHistoryData.forEach((entry, idx) => {
-            entry.staking_roi_accumulation_interval_paid_at = `${TIMESTAMP_INTERVAL_VALUES[staking_roi_payment_interval].name} ${totalIntervals - ((page_no - 1) * per_page) - idx}`;
+            entry.staking_roi_accumulation_interval_paid_at = `${TIMESTAMP_INTERVAL_VALUES[staking_roi_payment_interval].name} ${elapsedIntervals - idx}`;
         });
     }
 
