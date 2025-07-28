@@ -3,6 +3,9 @@ const axios = require('axios');
 const router = express.Router();
 const { formatRemainingTime } = require('./utils');
 
+// Cache for staking meta data
+const stakingMetaCache = new Map();
+
 const MODULE1_STAKING_BASE_URL = process.env.MODULE1_STAKING_BASE_URL;
 const MODULE1_STAKING_API_KEY = process.env.MODULE1_STAKING_API_KEY;
 
@@ -149,14 +152,21 @@ router.post('/:stakingTransactionID', async (req, res) => {
         const debitTxnId = debitResponse.data?.data?.transaction_id;
         const creditTxnId = creditResponse.data?.data?.transaction_id;
         const updateMetaUrl = `${MODULE1_STAKING_BASE_URL}/wp-json/nellalink/v2/smart-meta-manager/content/${stakingTransactionID}`;
+        
+        // Get staking plan to determine if we should update contract end time
+        const stakingPlanId = stakingMeta.staking_plan_id;
         const updateMetaBody = {
             staking_capital_withdrawn: 'yes',
             staking_capital_withdrawn_at: Math.floor(Date.now() / 1000),
-            staking_roi_payment_endtime_ts: Math.floor(Date.now() / 1000),
-            staking_roi_payment_endtime_ts_internal_pattern_2: Math.floor(Date.now() / 1000),
             staking_capital_withdraw_debit_transaction_id: debitTxnId,
             staking_capital_withdraw_credit_transaction_id: creditTxnId
         };
+        
+        // Only update contract end time for Plan 3 (instant capital withdrawal)
+        if (stakingPlanId === 'plan_3') {
+            updateMetaBody.staking_roi_payment_endtime_ts = Math.floor(Date.now() / 1000);
+            updateMetaBody.staking_roi_payment_endtime_ts_internal_pattern_2 = Math.floor(Date.now() / 1000);
+        }
         let updateMetaResponse;
         try {
             updateMetaResponse = await axios.put(updateMetaUrl, updateMetaBody, {
@@ -171,6 +181,9 @@ router.post('/:stakingTransactionID', async (req, res) => {
                 data: metaError.response?.data
             };
         }
+
+        // Clear cache for this staking transaction to ensure fresh data
+        stakingMetaCache.delete(`staking_meta_${stakingTransactionID}`);
 
         // Success response
         return res.json({

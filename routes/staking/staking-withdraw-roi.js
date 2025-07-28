@@ -161,7 +161,6 @@ router.post('/:stakingTransactionID', async function(req, res, next) {
         const withdrawalResult = await processWithdrawal(
             stakingTransactionID,
             request_id,
-            user_id,
             parseFloat(amount_to_withdraw),
             stakingMetaData,
             stakingMetrics,
@@ -206,7 +205,7 @@ function validateWithdrawalRequest(body) {
     }
 
     if (!user_id || isNaN(parseInt(user_id))) {
-        errors.push('user_id is required and must be a valid number');
+        errors.push('user_id is required and must be a valid user_id');
     }
 
     if (!amount_to_withdraw || typeof amount_to_withdraw !== 'string') {
@@ -324,8 +323,8 @@ function validateWithdrawalAmount(amountToWithdraw, stakingMetrics, stakingMetaD
 /**
  * Process the withdrawal transaction
  */
-async function processWithdrawal(stakingTransactionID, request_id, user_id, amountToWithdraw, stakingMetaData, stakingMetrics, userBearerJWToken) {
-    const roi_credit_request_id = `staking_roi_interest_payment_${request_id}`;
+async function processWithdrawal(stakingTransactionID, request_id, amountToWithdraw, stakingMetaData, stakingMetrics, userBearerJWToken) {
+    const roi_credit_request_id = `staking_roi_interest_payment_${stakingTransactionID}_${request_id}`;
     const staking_roi_payment_pattern = stakingMetaData.staking_roi_payment_pattern;
     
     // Get pattern-specific wallet ID and amounts
@@ -342,6 +341,7 @@ async function processWithdrawal(stakingTransactionID, request_id, user_id, amou
         staking_roi_amount_withdrawn_so_far = parseFloat(stakingMetaData.staking_roi_amount_withdrawn_so_far || 0);
         roi_withdrawal_interval = stakingMetaData.staking_roi_withdrawal_interval;
     }
+    const staking_user_id = stakingMetaData.user_id;
     
     const staking_roi_amount_remaining_to_be_paid_new = staking_roi_amount_remaining_to_be_paid - amountToWithdraw;
     const staking_roi_amount_withdrawn_so_far_new = staking_roi_amount_withdrawn_so_far + amountToWithdraw;
@@ -373,7 +373,7 @@ async function processWithdrawal(stakingTransactionID, request_id, user_id, amou
     // Credit user wallet
     const roiCreditRequestBody = buildRoiCreditRequestBody(
         roi_credit_request_id,
-        user_id,
+        staking_user_id,
         amountToWithdraw,
         staking_roi_payment_wallet_id,
         stakingTransactionID,
@@ -431,7 +431,7 @@ function buildUpdateStakingRequestBody(staking_roi_payment_pattern, remaining_to
 /**
  * Build ROI credit request body
  */
-function buildRoiCreditRequestBody(request_id, user_id, amount, wallet_id, stakingTransactionID, payment_pattern, stakingMetrics, stakingMetaData) {
+function buildRoiCreditRequestBody(request_id, staking_user_id, amount, wallet_id, stakingTransactionID, payment_pattern, stakingMetrics, stakingMetaData) {
     // Get pattern-specific withdrawn amount
     let accumulated_roi_user_have_already_withdraw;
     if (payment_pattern === "internal_pattern_2") {
@@ -442,7 +442,7 @@ function buildRoiCreditRequestBody(request_id, user_id, amount, wallet_id, staki
 
     return {
         "request_id": request_id,
-            "user_id": user_id,
+        "user_id": staking_user_id,
         "amount": amount,
         "wallet_id": wallet_id,
         "note": "Staking ROI Interest Withdrawal",
