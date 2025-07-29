@@ -372,7 +372,9 @@ function buildResponse(stakingMetaData, stakingMetrics, roiHistoryData, queryPar
         const pattern2IntervalsForProvidedDatetime = Math.floor((pattern2EffectiveProvidedDatetime - pattern2StartTime) / TIMESTAMP_INTERVAL_VALUES[stakingMetaData.staking_roi_payment_interval].ts);
         
         const pattern2AccumulatedRoiNow = pattern2Intervals * pattern2IntervalPayment;
-        const pattern2AccumulatedRoiUserCanWithdrawNow = pattern2AccumulatedRoiNow - pattern2WithdrawnSoFar;
+        // Cap accumulated ROI to never exceed the total ROI at end of contract
+        const pattern2AccumulatedRoiNowCapped = Math.min(pattern2AccumulatedRoiNow, pattern2RoiFullPaymentAtEnd);
+        const pattern2AccumulatedRoiUserCanWithdrawNow = pattern2AccumulatedRoiNowCapped - pattern2WithdrawnSoFar;
         const pattern2AccumulatedRoiUserCanWithdrawNowCapped = pattern2AccumulatedRoiUserCanWithdrawNow < 0 ? 0 : pattern2AccumulatedRoiUserCanWithdrawNow;
         const pattern2AccumulatedTotalRoiAtEnd = pattern2RoiFullPaymentAtEnd;
         const pattern2AccumulatedTotalAmountAtEnd = pattern2StakingAmount + pattern2RoiFullPaymentAtEnd;
@@ -389,11 +391,11 @@ function buildResponse(stakingMetaData, stakingMetrics, roiHistoryData, queryPar
             staking_roi_interval_payment_percentage: stakingMetaData.staking_roi_interval_payment_percentage_internal_pattern_2,
             staking_roi_payment_interval: stakingMetaData.staking_roi_payment_interval,
             staking_roi_payment_wallet_id: stakingMetaData.staking_roi_payment_wallet_id_internal_pattern_2,
-            accumulated_roi_now: pattern2AccumulatedRoiNow,
+            accumulated_roi_now: pattern2AccumulatedRoiNowCapped,
             accumulated_roi_user_can_withdraw_now: pattern2AccumulatedRoiUserCanWithdrawNowCapped,
             accumulated_roi_user_have_already_withdraw: pattern2WithdrawnSoFar,
-            accumulated_staking_capital_amount_at_end_of_staking_contract: pattern2StakingAmount,
             accumulated_total_roi_at_end_of_staking_contract: pattern2AccumulatedTotalRoiAtEnd,
+            accumulated_staking_capital_amount_at_end_of_staking_contract: pattern2StakingAmount,
             accumulated_total_roi_and_capital_at_end_of_staking_contract: pattern2AccumulatedTotalAmountAtEnd,
             staking_capital_locked_duration: stakingMetaData.staking_capital_locked_duration,
             staking_capital_locked_duration_formatted_name: stakingMetaData.staking_capital_locked_duration_formatted_name,
@@ -436,8 +438,8 @@ function buildResponse(stakingMetaData, stakingMetrics, roiHistoryData, queryPar
             accumulated_roi_now: stakingMetrics.accumulated_roi_now,
             accumulated_roi_user_can_withdraw_now: stakingMetrics.accumulated_roi_user_can_withdraw_now,
             accumulated_roi_user_have_already_withdraw: stakingMetrics.accumulated_roi_user_have_already_withdraw,
-            accumulated_staking_capital_amount_at_end_of_staking_contract: parseFloat(stakingMetaData.staking_amount),
             accumulated_total_roi_at_end_of_staking_contract: stakingMetrics.accumulated_total_roi_at_end_of_staking_contract,
+            accumulated_staking_capital_amount_at_end_of_staking_contract: parseFloat(stakingMetaData.staking_amount),
             accumulated_total_roi_and_capital_at_end_of_staking_contract: stakingMetrics.accumulated_total_amount_at_end_of_staking_contract,
             staking_capital_locked_duration: stakingMetaData.staking_capital_locked_duration,
             staking_capital_locked_duration_formatted_name: stakingMetaData.staking_capital_locked_duration_formatted_name,
