@@ -47,18 +47,23 @@ function calculateStakingMetrics(stakingData, providedDatetime = null) {
     // Get interval timestamp value
     const intervalTs = TIMESTAMP_INTERVAL_VALUES[staking_roi_payment_interval].ts;
     
-    // Calculate payment intervals - always use current time for "till now"
-    const count_number_of_staking_payment_interval_from_startime_till_now = 
-        Math.floor((currentTimestamp - staking_roi_payment_startime_ts) / intervalTs);
-    
     // For ROI calculation, use the minimum of current time and contract end time
     // This ensures ROI stops accumulating when contract ends (e.g., capital withdrawal in Plan 3)
     const effectiveNow = Math.min(currentTimestamp, staking_roi_payment_endtime_ts);
+    
+    // Calculate payment intervals - use effective time for "till now"
+    const count_number_of_staking_payment_interval_from_startime_till_now = 
+        Math.floor((effectiveNow - staking_roi_payment_startime_ts) / intervalTs);
+    
+    // For withdrawal logic, be more restrictive - only allow withdrawal of ROI earned before contract end
+    const withdrawalEffectiveNow = Math.min(currentTimestamp, staking_roi_payment_endtime_ts);
+    const count_number_of_staking_payment_interval_from_startime_till_now_for_withdrawal = 
+        Math.floor((withdrawalEffectiveNow - staking_roi_payment_startime_ts) / intervalTs);
     const count_number_of_staking_payment_interval_from_startime_till_provided_datetime = 
         Math.floor((calculationTimestamp - staking_roi_payment_startime_ts) / intervalTs);
     const count_number_of_staking_payment_interval_from_startime_till_endtime = 
         Math.floor((staking_roi_payment_endtime_ts - staking_roi_payment_startime_ts) / intervalTs);
-    // Calculate accumulated ROI
+    // Calculate accumulated ROI for display purposes
     let accumulated_roi_now = count_number_of_staking_payment_interval_from_startime_till_now * staking_roi_interval_payment_amount;
     const accumulated_roi_at_provided_datetime = count_number_of_staking_payment_interval_from_startime_till_provided_datetime * staking_roi_interval_payment_amount;
     
@@ -71,8 +76,9 @@ function calculateStakingMetrics(stakingData, providedDatetime = null) {
     const accumulated_total_amount_now = staking_amount + accumulated_roi_now;
     const accumulated_total_amount_at_end_of_staking_contract = staking_amount + staking_roi_full_payment_amount_at_end_of_contract;
 
-    // Calculate withdrawal-related values (correct logic: accrued - withdrawn)
-    let accumulated_roi_user_can_withdraw_now = accumulated_roi_now - parseFloat(staking_roi_amount_withdrawn_so_far || 0);
+    // Calculate withdrawal-related values using withdrawal-specific count
+    const accumulated_roi_for_withdrawal = count_number_of_staking_payment_interval_from_startime_till_now_for_withdrawal * staking_roi_interval_payment_amount;
+    let accumulated_roi_user_can_withdraw_now = accumulated_roi_for_withdrawal - parseFloat(staking_roi_amount_withdrawn_so_far || 0);
     if (accumulated_roi_user_can_withdraw_now < 0) accumulated_roi_user_can_withdraw_now = 0;
     
     // Cap the withdrawable amount to never exceed the total ROI at end of contract

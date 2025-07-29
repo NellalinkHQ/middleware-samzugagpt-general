@@ -87,12 +87,24 @@ router.post('/:stakingTransactionID', async function(req, res, next) {
         let stakingMetrics;
         if (stakingMetaData.staking_roi_payment_pattern === "internal_pattern_2") {
             // For pattern_2, calculate using pattern-specific fields
+            const staking_roi_payment_endtime_ts = parseInt(stakingMetaData.staking_roi_payment_endtime_ts_internal_pattern_2);
+            
+            // For Plan 3, if capital has been withdrawn, use the capital withdrawal time as the effective end time
+            const stakingPlanId = stakingMetaData.staking_plan_id;
+            const capitalWithdrawnAt = parseInt(stakingMetaData.staking_capital_withdrawn_at);
+            let effectiveEndTime = staking_roi_payment_endtime_ts;
+            
+            if (stakingPlanId === 'plan_3' && capitalWithdrawnAt && capitalWithdrawnAt > 0) {
+                // For Plan 3 with capital withdrawn, ROI stops at capital withdrawal time
+                effectiveEndTime = Math.min(staking_roi_payment_endtime_ts, capitalWithdrawnAt);
+            }
+            
             stakingMetrics = calculateStakingMetrics({
                 staking_amount: parseFloat(stakingMetaData.staking_amount_internal_pattern_2),
                 staking_roi_interval_payment_amount: parseFloat(stakingMetaData.staking_roi_interval_payment_amount_internal_pattern_2),
                 staking_roi_payment_interval: stakingMetaData.staking_roi_payment_interval,
                 staking_roi_payment_startime_ts: parseInt(stakingMetaData.staking_roi_payment_startime_ts_internal_pattern_2),
-                staking_roi_payment_endtime_ts: parseInt(stakingMetaData.staking_roi_payment_endtime_ts_internal_pattern_2),
+                staking_roi_payment_endtime_ts: effectiveEndTime,
                 staking_last_withdrawal_ts: parseInt(stakingMetaData.staking_roi_last_withdrawal_ts_internal_pattern_2) || 0,
                 staking_roi_full_payment_amount_at_end_of_contract: parseFloat(stakingMetaData.staking_roi_full_payment_amount_at_end_of_contract_internal_pattern_2),
                 staking_roi_amount_withdrawn_so_far: parseFloat(stakingMetaData.staking_roi_amount_withdrawn_so_far_internal_pattern_2 || 0)
