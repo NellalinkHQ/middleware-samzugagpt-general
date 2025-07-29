@@ -78,7 +78,7 @@ router.post('/:stakingTransactionID', async function(req, res, next) {
             return res.status(400).send({
                 status: false,
                 status_code: 400,
-                message: `Withdrawal request already exists`,
+                message: `Withdrawal already processed for this request`,
                 error: { request_id, existing_transaction: withdrawalExists }
             });
         }
