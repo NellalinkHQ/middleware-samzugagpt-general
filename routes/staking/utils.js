@@ -47,13 +47,13 @@ function calculateStakingMetrics(stakingData, providedDatetime = null) {
     // Get interval timestamp value
     const intervalTs = TIMESTAMP_INTERVAL_VALUES[staking_roi_payment_interval].ts;
     
+    // Calculate payment intervals - always use current time for "till now"
+    const count_number_of_staking_payment_interval_from_startime_till_now = 
+        Math.floor((currentTimestamp - staking_roi_payment_startime_ts) / intervalTs);
+    
     // For ROI calculation, use the minimum of current time and contract end time
     // This ensures ROI stops accumulating when contract ends (e.g., capital withdrawal in Plan 3)
     const effectiveNow = Math.min(currentTimestamp, staking_roi_payment_endtime_ts);
-    
-    // Calculate payment intervals
-    const count_number_of_staking_payment_interval_from_startime_till_now = 
-        Math.floor((effectiveNow - staking_roi_payment_startime_ts) / intervalTs);
     const count_number_of_staking_payment_interval_from_startime_till_provided_datetime = 
         Math.floor((calculationTimestamp - staking_roi_payment_startime_ts) / intervalTs);
     const count_number_of_staking_payment_interval_from_startime_till_endtime = 

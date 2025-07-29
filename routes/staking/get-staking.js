@@ -243,37 +243,58 @@ function generateRoiHistoryData(stakingMetaData, stakingMetrics, queryParams) {
     const intervalTs = TIMESTAMP_INTERVAL_VALUES[staking_roi_payment_interval].ts;
     const totalIntervals = stakingMetrics.count_number_of_staking_payment_interval_from_startime_till_endtime;
     
+    // For ROI history, use current time to determine elapsed intervals
+    // This ensures we only show intervals that have actually passed
+    const contractEndTime = parseInt(stakingMetaData.staking_roi_payment_endtime_ts);
+    const now = Math.floor(Date.now() / 1000);
+    const elapsedIntervals = Math.floor((Math.min(now, contractEndTime) - staking_roi_payment_startime_ts) / intervalTs);
+    
     // Adjust per_page if it exceeds total data
-    const adjustedPerPage = Math.min(per_page, totalIntervals);
+    const adjustedPerPage = Math.min(per_page, elapsedIntervals);
     
     // Calculate starting interval for current page
-    const startInterval = (page_no - 1) * adjustedPerPage + 1;
-    const endInterval = Math.min(startInterval + adjustedPerPage - 1, totalIntervals);
+    let startInterval, endInterval;
+    if (order === "DESC") {
+        // For DESC, start from the highest interval and work backwards
+        startInterval = elapsedIntervals - ((page_no - 1) * adjustedPerPage);
+        endInterval = startInterval - adjustedPerPage + 1;
+        // Ensure we don't go below 1
+        if (endInterval < 1) endInterval = 1;
+    } else {
+        // For ASC, start from the lowest interval
+        startInterval = (page_no - 1) * adjustedPerPage + 1;
+        endInterval = Math.min(startInterval + adjustedPerPage - 1, elapsedIntervals);
+    }
 
     const roiHistoryData = [];
-    const now = Math.floor(Date.now() / 1000);
     
-    // Calculate how many intervals have actually passed
-    const elapsedIntervals = Math.floor((now - staking_roi_payment_startime_ts) / intervalTs);
+    // Generate intervals based on order
+    const intervals = [];
+    if (order === "DESC") {
+        // For DESC, generate intervals from highest to lowest
+        for (let i = startInterval; i >= endInterval; i--) {
+            intervals.push(i);
+        }
+    } else {
+        // For ASC, generate intervals from lowest to highest
+        for (let i = startInterval; i <= endInterval; i++) {
+            intervals.push(i);
+        }
+    }
     
-    for (let i = startInterval; i <= endInterval; i++) {
-        const intervalTimestamp = staking_roi_payment_startime_ts + ((i - 1) * intervalTs);
+    for (const i of intervals) {
+        // Calculate when the ROI was actually accumulated (at the end of the interval)
+        const intervalTimestamp = staking_roi_payment_startime_ts + (i * intervalTs);
         
-        // Skip if this interval is in the future or hasn't passed yet
-        if (intervalTimestamp > now || i > elapsedIntervals) {
-            break;
+        // Skip if this interval is after the contract end time or hasn't passed yet
+        if (intervalTimestamp > contractEndTime || i > elapsedIntervals) {
+            continue;
         }
 
         const formattedDatetime = new Date(intervalTimestamp * 1000).toLocaleString();
         // Calculate the interval label for the current entry
-        // DESC: first entry is 'Second N', next is 'Second N-1', ...
-        // ASC:  first entry is 'Second 1', next is 'Second 2', ...
-        let paidAtCount;
-        if (order === "DESC") {
-            paidAtCount = totalIntervals - (i - startInterval);
-        } else {
-            paidAtCount = i;
-        }
+        // Use the actual interval number for the label
+        const paidAtCount = i;
 
         const interestInfo = {
             staking_roi_accumulation_id: i,
@@ -300,16 +321,7 @@ function generateRoiHistoryData(stakingMetaData, stakingMetrics, queryParams) {
         roiHistoryData.push(interestInfo);
     }
 
-    // Sort based on order
-    if (order === "ASC") {
-        roiHistoryData.sort((a, b) => a.staking_roi_accumulation_id - b.staking_roi_accumulation_id);
-    } else {
-        roiHistoryData.sort((a, b) => b.staking_roi_accumulation_id - a.staking_roi_accumulation_id);
-        // After sorting, update the interval label for DESC using actual elapsed intervals
-        roiHistoryData.forEach((entry, idx) => {
-            entry.staking_roi_accumulation_interval_paid_at = `${TIMESTAMP_INTERVAL_VALUES[staking_roi_payment_interval].name} ${elapsedIntervals - idx}`;
-        });
-    }
+    // No need to sort since we're already generating intervals in the correct order
 
     return roiHistoryData;
 }
@@ -352,7 +364,13 @@ function buildResponse(stakingMetaData, stakingMetrics, roiHistoryData, queryPar
         // Cap current time at contract end
         const now = Math.floor(Date.now() / 1000);
         const pattern2EffectiveNow = Math.min(now, pattern2EndTime);
-        const pattern2Intervals = Math.floor((pattern2EffectiveNow - pattern2StartTime) / TIMESTAMP_INTERVAL_VALUES[stakingMetaData.staking_roi_payment_interval].ts);
+        const pattern2Intervals = Math.floor((now - pattern2StartTime) / TIMESTAMP_INTERVAL_VALUES[stakingMetaData.staking_roi_payment_interval].ts);
+        
+        // Calculate intervals for provided datetime
+        const providedDatetime = queryParams.count_for_provided_datetime_ts;
+        const pattern2EffectiveProvidedDatetime = Math.min(providedDatetime, now);
+        const pattern2IntervalsForProvidedDatetime = Math.floor((pattern2EffectiveProvidedDatetime - pattern2StartTime) / TIMESTAMP_INTERVAL_VALUES[stakingMetaData.staking_roi_payment_interval].ts);
+        
         const pattern2AccumulatedRoiNow = pattern2Intervals * pattern2IntervalPayment;
         const pattern2AccumulatedRoiUserCanWithdrawNow = pattern2AccumulatedRoiNow - pattern2WithdrawnSoFar;
         const pattern2AccumulatedRoiUserCanWithdrawNowCapped = pattern2AccumulatedRoiUserCanWithdrawNow < 0 ? 0 : pattern2AccumulatedRoiUserCanWithdrawNow;
@@ -364,7 +382,7 @@ function buildResponse(stakingMetaData, stakingMetrics, roiHistoryData, queryPar
             staking_plan_id: stakingMetaData.staking_plan_id,
             staking_plan_name: stakingMetaData.staking_plan_name,
             count_number_of_staking_payment_interval_from_startime_till_now: pattern2Intervals,
-            count_number_of_staking_payment_interval_from_startime_till_provided_datetime: pattern2Intervals, // For pattern2, use same as till now
+            count_number_of_staking_payment_interval_from_startime_till_provided_datetime: pattern2IntervalsForProvidedDatetime,
             count_number_of_staking_payment_interval_from_startime_till_endtime: Math.floor((pattern2EndTime - pattern2StartTime) / TIMESTAMP_INTERVAL_VALUES[stakingMetaData.staking_roi_payment_interval].ts),
             staking_amount: pattern2StakingAmount,
             staking_roi_interval_payment_amount: pattern2IntervalPayment,
@@ -394,12 +412,21 @@ function buildResponse(stakingMetaData, stakingMetrics, roiHistoryData, queryPar
             timestamp_retrieved_at: stakingMetrics.accumulated_timestamp_retrieved_at,
             datetime_retrieved_at: stakingMetrics.accumulated_datetime_retrieved_at
         };
+        // Calculate normal pattern metrics with current time for "till now" values
+        const normalPatternMetrics = calculateStakingMetricsFromMetaData(
+            {
+                ...stakingMetaData,
+                staking_roi_amount_withdrawn_so_far: stakingMetaData.staking_roi_amount_withdrawn_so_far || 0
+            }
+            // No second parameter = uses current time
+        );
+        
         // Always add normal_pattern (normal summary)
         summaryData.normal_pattern = {
             staking_plan_id: stakingMetaData.staking_plan_id,
             staking_plan_name: stakingMetaData.staking_plan_name,
-            count_number_of_staking_payment_interval_from_startime_till_now: stakingMetrics.count_number_of_staking_payment_interval_from_startime_till_now,
-            count_number_of_staking_payment_interval_from_startime_till_provided_datetime: stakingMetrics.count_number_of_staking_payment_interval_from_startime_till_provided_datetime,
+            count_number_of_staking_payment_interval_from_startime_till_now: normalPatternMetrics.count_number_of_staking_payment_interval_from_startime_till_now,
+            count_number_of_staking_payment_interval_from_startime_till_provided_datetime: normalPatternMetrics.count_number_of_staking_payment_interval_from_startime_till_provided_datetime,
             count_number_of_staking_payment_interval_from_startime_till_endtime: stakingMetrics.count_number_of_staking_payment_interval_from_startime_till_endtime,
             staking_amount: parseFloat(stakingMetaData.staking_amount),
             staking_roi_interval_payment_amount: parseFloat(stakingMetaData.staking_roi_interval_payment_amount),
