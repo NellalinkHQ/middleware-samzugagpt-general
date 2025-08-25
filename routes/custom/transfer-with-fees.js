@@ -68,7 +68,7 @@ router.post('/', async function(req, res, next) {
 
         //main deal
         let wallet_id_fee = "szcb2";
-        let amount_fee = 1;
+        let amount_fee = 0.1;
         let min_amount_transfer = 5;
         let max_amount_transfer = 10000;
 
