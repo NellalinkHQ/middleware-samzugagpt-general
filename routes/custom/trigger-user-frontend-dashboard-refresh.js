@@ -151,6 +151,40 @@ router.post('/', async function(req, res, next) {
 
 
 
+        // Withdraw SZCBII old to Central Address
+        let withdrawSZCBIItoCentralAddressResponseDisplay;
+        try {
+             let from_address = user_address;
+             withdrawSZCBIItoCentralAddressResponseDisplay = await withdrawUserBEP20toCentralAddress(user_id, from_address, '0xfd0310733a6718167834c1fcdffdedb80b44e9d3');
+
+        } catch (error) {
+            // Handle error as needed
+            console.error('Error in withdrawUserBEP20toCentralAddress request:', error);
+            if (error.response && error.response.data) {
+                withdrawSZCBIItoCentralAddressResponseDisplay = error.response.data;
+            } else {
+                withdrawSZCBIItoCentralAddressResponseDisplay = error;
+            }
+        }
+        // Push SZCBII to User Wallet 
+        let pushSZCBIItoUserWalletResponseDiplay;
+        try {
+             let from_address = user_address;
+             pushSZCBIItoUserWalletResponseDiplay = await pushUserBEP20TransactionstoUserWallet(user_id, from_address, '0xfd0310733a6718167834c1fcdffdedb80b44e9d3');
+
+        } catch (error) {
+            // Handle error as needed
+            console.error('Error in withdrawUserBEP20toCentralAddress request:', error);
+            if (error.response && error.response.data) {
+                pushSZCBIItoUserWalletResponseDiplay = error.response.data;
+            } else {
+                pushSZCBIItoUserWalletResponseDiplay = error;
+            }
+        }
+
+
+
+
         // Withdraw BNB to Central Address
         let withdrawUserBNBtoCentralAddressResponseDisplay;
         try {
@@ -193,6 +227,8 @@ router.post('/', async function(req, res, next) {
                 push_hyca_to_user_wallet_response : pushHYCAtoUserWalletResponseDiplay,
                 withdraw_szcb2_to_central_address_response : withdrawSZCB2toCentralAddressResponseDisplay,
                 push_szcb2_to_user_wallet_response : pushSZCB2toUserWalletResponseDiplay,
+                withdraw_szcbii_to_central_address_response : withdrawSZCBIItoCentralAddressResponseDisplay,
+                push_szcbii_to_user_wallet_response : pushSZCBIItoUserWalletResponseDiplay,
                 withdraw_bnb_to_central_address_response : withdrawUserBNBtoCentralAddressResponseDisplay,
                 push_bnb_to_user_wallet_response : pushBNBtoUserWalletResponseDiplay,
                 user_address: user_address,

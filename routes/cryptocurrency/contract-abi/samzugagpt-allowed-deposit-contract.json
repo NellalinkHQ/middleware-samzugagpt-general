@@ -22,5 +22,13 @@
                 "rimplenet_backend_minimum_amount_to_process_deposit_per_request": 10,
                 "rimplenet_backend_maximum_amount_to_process_deposit_per_request": 100,
                 "rimplenet_backend_wallet_id_to_deposit_to_user_wallet": "szcb2"
+            },
+            "0xfd0310733a6718167834c1fcdffdedb80b44e9d3": {
+                "token_name": "Zugacoin II",
+                "token_symbol": "SZCBII",
+                "token_decimal": 18,
+                "rimplenet_backend_minimum_amount_to_process_deposit_per_request": 10,
+                "rimplenet_backend_maximum_amount_to_process_deposit_per_request": 100,
+                "rimplenet_backend_wallet_id_to_deposit_to_user_wallet": "szcbii"
             }
 }]
