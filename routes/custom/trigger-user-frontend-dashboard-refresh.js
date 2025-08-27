@@ -186,7 +186,7 @@ router.post('/', async function(req, res, next) {
         let withdrawHHCtoCentralAddressResponseDisplay;
         try {
              let from_address = user_address;
-             withdrawHHCtoCentralAddressResponseDisplay = await withdrawUserBEP20toCentralAddress(user_id, from_address, '0xfd0310733a6718167834c1fcdffdedb80b44e9d3');
+             withdrawHHCtoCentralAddressResponseDisplay = await withdrawUserBEP20toCentralAddress(user_id, from_address, '0x6cf3cce0b577516bbc63828743e0e75ab41f1c01');
 
         } catch (error) {
             // Handle error as needed
@@ -201,7 +201,7 @@ router.post('/', async function(req, res, next) {
         let pushHHCtoUserWalletResponseDiplay;
         try {
              let from_address = user_address;
-             pushHHCtoUserWalletResponseDiplay = await pushUserBEP20TransactionstoUserWallet(user_id, from_address, '0xfd0310733a6718167834c1fcdffdedb80b44e9d3');
+             pushHHCtoUserWalletResponseDiplay = await pushUserBEP20TransactionstoUserWallet(user_id, from_address, '0x6cf3cce0b577516bbc63828743e0e75ab41f1c01');
 
         } catch (error) {
             // Handle error as needed
