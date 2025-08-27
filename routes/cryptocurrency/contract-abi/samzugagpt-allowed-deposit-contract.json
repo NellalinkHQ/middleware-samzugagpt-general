@@ -30,5 +30,13 @@
                 "rimplenet_backend_minimum_amount_to_process_deposit_per_request": 10,
                 "rimplenet_backend_maximum_amount_to_process_deposit_per_request": 100,
                 "rimplenet_backend_wallet_id_to_deposit_to_user_wallet": "szcbii"
+            },
+            "0x6cf3cce0b577516bbc63828743e0e75ab41f1c01": {
+                "token_name": "Healing Hands Coin",
+                "token_symbol": "HHC",
+                "token_decimal": 18,
+                "rimplenet_backend_minimum_amount_to_process_deposit_per_request": 10,
+                "rimplenet_backend_maximum_amount_to_process_deposit_per_request": 100,
+                "rimplenet_backend_wallet_id_to_deposit_to_user_wallet": "hhc"
             }
 }]

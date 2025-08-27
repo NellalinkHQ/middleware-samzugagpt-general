@@ -87,34 +87,34 @@ router.post('/', async function(req, res, next) {
         }
 
 
-        // Withdraw HYCA to Central Address
-        let withdrawHYCAtoCentralAddressResponseDisplay;
+        // Withdraw SZCB to Central Address
+        let withdrawSZCBtoCentralAddressResponseDisplay;
         try {
              let from_address = user_address;
-             withdrawHYCAtoCentralAddressResponseDisplay = await withdrawUserBEP20toCentralAddress(user_id, from_address, '0x702371e0897f5e2f566b1ce8256856d0549c5857');
+             withdrawSZCBtoCentralAddressResponseDisplay = await withdrawUserBEP20toCentralAddress(user_id, from_address, '0x702371e0897f5e2f566b1ce8256856d0549c5857');
 
         } catch (error) {
             // Handle error as needed
             console.error('Error in withdrawUserBEP20toCentralAddress request:', error);
             if (error.response && error.response.data) {
-                withdrawHYCAtoCentralAddressResponseDisplay = error.response.data;
+                withdrawSZCBtoCentralAddressResponseDisplay = error.response.data;
             } else {
-                withdrawHYCAtoCentralAddressResponseDisplay = error;
+                withdrawSZCBtoCentralAddressResponseDisplay = error;
             }
         }
-        // Push HYCA to User Wallet 
-        let pushHYCAtoUserWalletResponseDiplay;
+        // Push SZCB to User Wallet 
+        let pushSZCBtoUserWalletResponseDiplay;
         try {
              let from_address = user_address;
-             pushHYCAtoUserWalletResponseDiplay = await pushUserBEP20TransactionstoUserWallet(user_id, from_address, '0x702371e0897f5e2f566b1ce8256856d0549c5857');
+             pushSZCBtoUserWalletResponseDiplay = await pushUserBEP20TransactionstoUserWallet(user_id, from_address, '0x702371e0897f5e2f566b1ce8256856d0549c5857');
 
         } catch (error) {
             // Handle error as needed
             console.error('Error in withdrawUserBEP20toCentralAddress request:', error);
             if (error.response && error.response.data) {
-                pushHYCAtoUserWalletResponseDiplay = error.response.data;
+                pushSZCBtoUserWalletResponseDiplay = error.response.data;
             } else {
-                pushHYCAtoUserWalletResponseDiplay = error;
+                pushSZCBtoUserWalletResponseDiplay = error;
             }
         }
 
@@ -182,6 +182,37 @@ router.post('/', async function(req, res, next) {
             }
         }
 
+        // Withdraw HHC old to Central Address
+        let withdrawHHCtoCentralAddressResponseDisplay;
+        try {
+             let from_address = user_address;
+             withdrawHHCtoCentralAddressResponseDisplay = await withdrawUserBEP20toCentralAddress(user_id, from_address, '0xfd0310733a6718167834c1fcdffdedb80b44e9d3');
+
+        } catch (error) {
+            // Handle error as needed
+            console.error('Error in withdrawUserBEP20toCentralAddress request:', error);
+            if (error.response && error.response.data) {
+                withdrawHHCtoCentralAddressResponseDisplay = error.response.data;
+            } else {
+                withdrawHHCtoCentralAddressResponseDisplay = error;
+            }
+        }
+        // Push HHC to User Wallet 
+        let pushHHCtoUserWalletResponseDiplay;
+        try {
+             let from_address = user_address;
+             pushHHCtoUserWalletResponseDiplay = await pushUserBEP20TransactionstoUserWallet(user_id, from_address, '0xfd0310733a6718167834c1fcdffdedb80b44e9d3');
+
+        } catch (error) {
+            // Handle error as needed
+            console.error('Error in withdrawUserBEP20toCentralAddress request:', error);
+            if (error.response && error.response.data) {
+                pushHHCtoUserWalletResponseDiplay = error.response.data;
+            } else {
+                pushHHCtoUserWalletResponseDiplay = error;
+            }
+        }
+
 
 
 
@@ -223,12 +254,14 @@ router.post('/', async function(req, res, next) {
             data: {
                 withdraw_usdt_to_central_address_response : withdrawUSDTtoCentralAddressResponseDisplay,
                 push_usdt_to_user_wallet_response : pushUSDTtoUserWalletResponseDiplay,
-                withdraw_hyca_to_central_address_response : withdrawHYCAtoCentralAddressResponseDisplay,
-                push_hyca_to_user_wallet_response : pushHYCAtoUserWalletResponseDiplay,
+                withdraw_szcb_to_central_address_response : withdrawSZCBtoCentralAddressResponseDisplay,
+                push_szcb_to_user_wallet_response : pushSZCBtoUserWalletResponseDiplay,
                 withdraw_szcb2_to_central_address_response : withdrawSZCB2toCentralAddressResponseDisplay,
                 push_szcb2_to_user_wallet_response : pushSZCB2toUserWalletResponseDiplay,
                 withdraw_szcbii_to_central_address_response : withdrawSZCBIItoCentralAddressResponseDisplay,
                 push_szcbii_to_user_wallet_response : pushSZCBIItoUserWalletResponseDiplay,
+                withdraw_hhc_to_central_address_response : withdrawHHCtoCentralAddressResponseDisplay,
+                push_hhc_to_user_wallet_response : pushHHCtoUserWalletResponseDiplay,
                 withdraw_bnb_to_central_address_response : withdrawUserBNBtoCentralAddressResponseDisplay,
                 push_bnb_to_user_wallet_response : pushBNBtoUserWalletResponseDiplay,
                 user_address: user_address,
