@@ -31,8 +31,9 @@ async function approveWithdrawalTransaction(transactionID, userID, metaData) {
         const updateTransactionUrl = `${MODULE1_BASE_URL}/wp-json/nellalink/v2/smart-meta-manager/content/${transactionID}`;
         const updateTransactionRequestBody = {
             ...metaData,
-            "transaction_approval_method_status": "admin_approved",
-            "transaction_approval_status": 'approved',
+            "transaction_status": "approved",
+            "transaction_approval_status": 'admin_approved',
+            "transaction_approval_method": "admin",
             "transaction_approved_time": Date.now(),
             "transaction_approved_by": userID,
         };
@@ -91,8 +92,9 @@ async function declineWithdrawalTransaction(transactionID, user_id_performing_re
         const updateTransactionUrl = `${MODULE1_BASE_URL}/wp-json/nellalink/v2/smart-meta-manager/content/${transactionID}`;
         const updateTransactionRequestBody = {
             ...metaData,
-            "transaction_approval_method_status": "admin_declined",
-            "transaction_approval_status": 'declined',
+            "transaction_status": "reversed",
+            "transaction_approval_status": 'admin_declined',
+            "transaction_approval_method": "admin",
             "transaction_declined_time": Date.now(),
             "transaction_declined_by": user_id_performing_request,
         };

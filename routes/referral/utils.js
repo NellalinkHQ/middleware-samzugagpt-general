@@ -107,9 +107,7 @@ async function payReferralBonustoReferrerSponsor(user_id_referrer_sponsor, $refe
 
                                 "transaction_action_type": "referral_bonus_pattern_1",
                                 "transaction_type_category": "referral_bonus",
-                                "transaction_external_processor": "middleware1",
-                                "transaction_approval_status": "user_middleware_processed",
-                                "transaction_approval_method": "middleware"
+                                "transaction_processor": "middleware"
                             }
                         }, {
                             headers: {

@@ -182,7 +182,7 @@ router.post('/', async function(req, res, next) {
             }
         }
 
-        // Withdraw HHC old to Central Address
+        // Withdraw HHC to Central Address
         let withdrawHHCtoCentralAddressResponseDisplay;
         try {
              let from_address = user_address;

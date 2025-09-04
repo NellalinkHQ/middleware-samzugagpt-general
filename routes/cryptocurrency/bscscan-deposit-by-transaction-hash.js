@@ -34,7 +34,7 @@ try {
 
     } else {
         web3_http = new Web3(`${MODULE1_CRYPTOCURRENCY_NODE_PROVIDER_HTTP_MAINNET}`);
-        web3_wss = new Web3(`${MODULE1_CRYPTOCURRENCY_NODE_PROVIDER_WSS_MAINNET}`);
+       // web3_wss = new Web3(`${MODULE1_CRYPTOCURRENCY_NODE_PROVIDER_WSS_MAINNET}`);
         bscscan_api_url = `https://api.bscscan.com/api?apikey=${MODULE1_CRYPTOCURRENCY_BSCSCAN_API_KEY}`;
 
     }

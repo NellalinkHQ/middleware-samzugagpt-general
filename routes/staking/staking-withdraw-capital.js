@@ -1,7 +1,11 @@
 const express = require('express');
 const axios = require('axios');
 const router = express.Router();
-const { formatRemainingTime } = require('./utils');
+const { 
+    getStakingCapitalMetrics,
+    calculateStakingCapitalMetricsFromMetaData,
+    formatRemainingTime 
+} = require('./utils');
 
 // Cache for staking meta data
 const stakingMetaCache = new Map();
@@ -37,31 +41,10 @@ router.post('/:stakingTransactionID', async (req, res) => {
         const stakingMeta = stakingMetaResponse.data.data;
 
         // Extract required fields
-        const staking_capital_locked_duration_ts = parseInt(stakingMeta.staking_capital_locked_duration_ts);
         const staking_capital_payment_wallet_id = stakingMeta.staking_capital_payment_wallet_id;
         const staking_amount = parseFloat(stakingMeta.amount);
         const user_id = stakingMeta.user_id;
         const staking_locked_wallet_id = stakingMeta.staking_capital_locked_wallet_id || `${staking_capital_payment_wallet_id}_staking_locked`;
-
-        // Check if capital lock duration is due
-        const now = Math.floor(Date.now() / 1000);
-        if (now < staking_capital_locked_duration_ts) {
-            const remainingSeconds = staking_capital_locked_duration_ts - now;
-            return res.status(400).json({
-                status: false,
-                status_code: 400,
-                message: 'Capital lock period not yet completed',
-                details: {
-                    staking_transaction_id : stakingTransactionID,
-                    staking_capital_locked_duration_ts,
-                    current_timestamp: now,
-                    current_time_formatted: new Date(now * 1000).toLocaleString(),
-                    capital_withdrawal_time_formatted: new Date(staking_capital_locked_duration_ts * 1000).toLocaleString(),
-                    remaining_time_seconds: remainingSeconds,
-                    remaining_time_formatted: formatRemainingTime(remainingSeconds)
-                }
-            });
-        }
 
         // Check if capital has already been withdrawn
         if (stakingMeta.staking_capital_withdrawn && stakingMeta.staking_capital_withdrawn.toString().toLowerCase() === 'yes') {
@@ -75,6 +58,28 @@ router.post('/:stakingTransactionID', async (req, res) => {
                     staking_capital_withdrawn_at: stakingMeta.staking_capital_withdrawn_at,
                     staking_capital_withdraw_debit_transaction_id: stakingMeta.staking_capital_withdraw_debit_transaction_id,
                     staking_capital_withdraw_credit_transaction_id: stakingMeta.staking_capital_withdraw_credit_transaction_id
+                }
+            });
+        }
+
+        // Calculate capital metrics using utils
+        const capitalMetrics = calculateStakingCapitalMetricsFromMetaData(stakingMeta);
+        
+        // Check if capital can be withdrawn
+        if (!capitalMetrics.can_withdraw_capital) {
+            const remainingSeconds = capitalMetrics.capital_locked_duration_ts - capitalMetrics.current_timestamp;
+            return res.status(400).json({
+                status: false,
+                status_code: 400,
+                message: 'Capital lock period not yet completed',
+                details: {
+                    staking_parent_transaction_id : stakingTransactionID,
+                    staking_capital_locked_duration_ts: capitalMetrics.capital_locked_duration_ts,
+                    current_timestamp: capitalMetrics.current_timestamp,
+                    current_time_formatted: new Date(capitalMetrics.current_timestamp * 1000).toLocaleString(),
+                    capital_withdrawal_time_formatted: new Date(capitalMetrics.capital_locked_duration_ts * 1000).toLocaleString(),
+                    remaining_time_seconds: remainingSeconds,
+                    remaining_time_formatted: formatRemainingTime(remainingSeconds)
                 }
             });
         }
@@ -122,7 +127,7 @@ router.post('/:stakingTransactionID', async (req, res) => {
             wallet_id: staking_capital_payment_wallet_id,
             note: 'Staking Capital Withdrawal Completed',
             meta_data: {
-                staking_transaction_id: stakingTransactionID,
+                staking_parent_transaction_id: stakingTransactionID,
                 transaction_action_type: 'staking_capital_withdrawal_credit',
                 transaction_type_category: 'staking',
                 transaction_external_processor: 'middleware1',
@@ -162,10 +167,18 @@ router.post('/:stakingTransactionID', async (req, res) => {
             staking_capital_withdraw_credit_transaction_id: creditTxnId
         };
         
+        // Get current time for meta updates
+        const currentTime = Math.floor(Date.now() / 1000);
+        
         // Only update contract end time for Plan 3 (instant capital withdrawal)
         if (stakingPlanId === 'plan_3') {
-            updateMetaBody.staking_roi_payment_endtime_ts = Math.floor(Date.now() / 1000);
-            updateMetaBody.staking_roi_payment_endtime_ts_internal_pattern_2 = Math.floor(Date.now() / 1000);
+            const originalEndTime = parseInt(stakingMeta.staking_roi_payment_endtime_ts);
+            const originalEndTimePattern2 = parseInt(stakingMeta.staking_roi_payment_endtime_ts_internal_pattern_2);
+            
+            if(currentTime < originalEndTime){
+               updateMetaBody.staking_roi_payment_endtime_ts = currentTime;
+               updateMetaBody.staking_roi_payment_endtime_ts_internal_pattern_2 = currentTime;
+            }
         }
         let updateMetaResponse;
         try {
@@ -199,7 +212,7 @@ router.post('/:stakingTransactionID', async (req, res) => {
                 debit_transaction: debitResponse.data,
                 credit_transaction: creditResponse.data,
                 update_meta: updateMetaResponse,
-                processed_at: now
+                processed_at: currentTime
             }
         });
     } catch (error) {

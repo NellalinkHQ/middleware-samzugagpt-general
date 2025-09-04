@@ -55,7 +55,7 @@ if (MODULE1_CRYPTOCURRENCY_BSCSCAN_NETWORK === "testnet") {
     web3_wss = new Web3(`${MODULE1_CRYPTOCURRENCY_NODE_PROVIDER_WSS_TESTNET}`);
 } else {
     web3_http = new Web3(`${MODULE1_CRYPTOCURRENCY_NODE_PROVIDER_HTTP_MAINNET}`);
-    web3_wss = new Web3(`${MODULE1_CRYPTOCURRENCY_NODE_PROVIDER_WSS_MAINNET}`);
+    //web3_wss = new Web3(`${MODULE1_CRYPTOCURRENCY_NODE_PROVIDER_WSS_MAINNET}`);
 }
 
  async function withdrawUserBNBtoCentralAddress(user_id, from_address){
@@ -212,13 +212,33 @@ async function pushUserBNBTransactionstoUserWallet(user_id, from_address) {
                     let appCreditResponseData;
 
                     try {
+
+                        if(MODULE1_CRYPTOCURRENCY_BSCSCAN_NETWORK==="testnet"){
+                            transaction_verification_url = `https://testnet.bscscan.com/tx/${transaction.request_id}`;
+                        }else{
+                            transaction_verification_url = `https://bscscan.com/tx/${transaction.request_id}`;
+                        }
                         // Send credit request to the backend
                         const creditResponse = await axios.post(creditUrl, {
                             request_id: transaction.request_id,
                             user_id: transaction.user_id,
                             wallet_id: transaction.wallet_id,
                             amount: transaction.amount,
-                            note: transaction.note
+                            note: transaction.note,
+                            meta_data : {
+
+                                transaction_type_category : "deposits",
+                                transaction_action_type : "blockchain_bscscan_deposit_bnb",
+                                transaction_processor : "middleware",
+                                transaction_external_processor : "bscscan",
+                                transaction_verification_url : transaction_verification_url,
+                                blockchain_processor_network : MODULE1_CRYPTOCURRENCY_BSCSCAN_NETWORK,
+                                blockchain_transaction_hash: transaction.hash,
+                                blockchain_block_number: transaction.blockNumber,
+                                blockchain_from_address: transaction.from,
+                                blockchain_to_address: transaction.to,
+                                blockchain_value: transaction.value
+                            }
                         }, {
                             headers: {
                                 'x-api-key': MODULE1_BASE_API_KEY
@@ -695,13 +715,31 @@ async function pushUserBEP20TransactionstoUserWallet(user_id, from_address, cont
                     let appCreditResponseData;
 
                     try {
+                        if(MODULE1_CRYPTOCURRENCY_BSCSCAN_NETWORK==="testnet"){
+                            transaction_verification_url = `https://testnet.bscscan.com/tx/${transaction.request_id}`;
+                        }else{
+                            transaction_verification_url = `https://bscscan.com/tx/${transaction.request_id}`;
+                        }
                         // Send credit request to the backend
                         const creditResponse = await axios.post(creditUrl, {
                             request_id: transaction.request_id,
                             user_id: transaction.user_id,
                             wallet_id: transaction.wallet_id,
                             amount: transaction.amount,
-                            note: transaction.note
+                            note: transaction.note,
+                            meta_data : {
+                                transaction_type_category : "deposits",
+                                transaction_action_type : "blockchain_bscscan_deposit_bep20",
+                                transaction_processor : "middleware",
+                                transaction_external_processor : "bscscan",
+                                transaction_verification_url : transaction_verification_url,
+                                blockchain_processor_network : MODULE1_CRYPTOCURRENCY_BSCSCAN_NETWORK,
+                                blockchain_transaction_hash: transaction.hash,
+                                blockchain_block_number: transaction.blockNumber,
+                                blockchain_from_address: transaction.from,
+                                blockchain_to_address: transaction.to,
+                                blockchain_value: transaction.value
+                            }
                         }, {
                             headers: {
                                 'x-api-key': MODULE1_BASE_API_KEY

@@ -6,8 +6,9 @@ const { handleTryCatchError } = require('../../middleware-utils/custom-try-catch
 
 // Import the new utils
 const {
-    calculateStakingMetrics,
-    calculateStakingMetricsFromMetaData,
+    getStakingROIMetrics,
+    calculateStakingROIMetricsFromMetaData,
+    calculateStakingROIMetricsFromMetaDataPattern2,
     validateStakingData,
     isStakingContractEnded,
     getRemainingStakingTime,
@@ -99,7 +100,7 @@ router.post('/:stakingTransactionID', async function(req, res, next) {
                 effectiveEndTime = Math.min(staking_roi_payment_endtime_ts, capitalWithdrawnAt);
             }
             
-            stakingMetrics = calculateStakingMetrics({
+            stakingMetrics = getStakingROIMetrics({
                 staking_amount: parseFloat(stakingMetaData.staking_amount_internal_pattern_2),
                 staking_roi_interval_payment_amount: parseFloat(stakingMetaData.staking_roi_interval_payment_amount_internal_pattern_2),
                 staking_roi_payment_interval: stakingMetaData.staking_roi_payment_interval,
@@ -111,7 +112,7 @@ router.post('/:stakingTransactionID', async function(req, res, next) {
             });
         } else {
             // For normal pattern, use the standard calculation
-            stakingMetrics = calculateStakingMetricsFromMetaData(stakingMetaData);
+            stakingMetrics = calculateStakingROIMetricsFromMetaData(stakingMetaData);
         }
         
         // Validate staking data
@@ -148,6 +149,8 @@ router.post('/:stakingTransactionID', async function(req, res, next) {
                 error: withdrawalValidation.details
             });
         }
+
+
 
         // Check if current time is at or after staking_roi_next_withdrawal_duration_ts
         const staking_roi_next_withdrawal_duration_ts = parseInt(stakingMetaData.staking_roi_next_withdrawal_duration_ts);
@@ -371,7 +374,8 @@ async function processWithdrawal(stakingTransactionID, request_id, amountToWithd
         staking_roi_payment_pattern,
         staking_roi_amount_remaining_to_be_paid_new,
         staking_roi_amount_withdrawn_so_far_new,
-        next_withdrawal_ts
+        next_withdrawal_ts,
+        stakingMetaData
     );
 
     const stakingMetaUrl = `${MODULE1_STAKING_BASE_URL}/wp-json/nellalink/v2/smart-meta-manager/content/${stakingTransactionID}`;
@@ -425,17 +429,65 @@ async function processWithdrawal(stakingTransactionID, request_id, amountToWithd
 /**
  * Build update staking request body
  */
-function buildUpdateStakingRequestBody(staking_roi_payment_pattern, remaining_to_be_paid_new, withdrawn_so_far_new, next_withdrawal_ts) {
+function buildUpdateStakingRequestBody(staking_roi_payment_pattern, remaining_to_be_paid_new, withdrawn_so_far_new, next_withdrawal_ts, stakingMetaData = null) {
+    const currentTime = Math.floor(Date.now() / 1000);
+    
     if (staking_roi_payment_pattern === "internal_pattern_2") {
+        // For pattern_2, we need to calculate the equivalent normal pattern values
+        // since the withdrawal amount is in pattern_2 currency but normal pattern tracks in normal currency
+        let normal_remaining_to_be_paid_new = remaining_to_be_paid_new;
+        let normal_withdrawn_so_far_new = withdrawn_so_far_new;
+        
+        if (stakingMetaData) {
+            // Convert pattern_2 amounts to normal pattern amounts using exchange rate
+            const exchangeRate = parseFloat(stakingMetaData.exchange_rate_at_time_of_staking || 1);
+            
+            // Calculate the withdrawal amount in pattern_2 currency
+            const current_pattern2_withdrawn = parseFloat(stakingMetaData.staking_roi_amount_withdrawn_so_far_internal_pattern_2 || 0);
+            const pattern2_withdrawal_amount = withdrawn_so_far_new - current_pattern2_withdrawn;
+            
+            // Convert the withdrawal amount to normal pattern currency
+            // Pattern_2 amounts are created by multiplying normal amounts by exchange rate
+            // So to convert back: pattern2_amount / exchange_rate = normal_amount
+            const normal_withdrawal_amount = pattern2_withdrawal_amount / exchangeRate;
+            
+            // Update normal pattern values
+            const current_normal_withdrawn = parseFloat(stakingMetaData.staking_roi_amount_withdrawn_so_far || 0);
+            normal_withdrawn_so_far_new = current_normal_withdrawn + normal_withdrawal_amount;
+            
+            // Update remaining amounts accordingly
+            const current_normal_remaining = parseFloat(stakingMetaData.staking_roi_amount_remaining_to_be_paid || 0);
+            normal_remaining_to_be_paid_new = current_normal_remaining - normal_withdrawal_amount;
+            
+            // Debug logging (can be removed later)
+            console.log('Exchange Rate:', exchangeRate);
+            console.log('Pattern2 Withdrawal Amount:', pattern2_withdrawal_amount);
+            console.log('Normal Withdrawal Amount:', normal_withdrawal_amount);
+            console.log('Current Pattern2 Withdrawn:', current_pattern2_withdrawn);
+            console.log('Current Normal Withdrawn:', current_normal_withdrawn);
+            console.log('New Pattern2 Withdrawn:', withdrawn_so_far_new);
+            console.log('New Normal Withdrawn:', normal_withdrawn_so_far_new);
+        }
+        
         return {
             "staking_roi_amount_remaining_to_be_paid_internal_pattern_2": remaining_to_be_paid_new,
             "staking_roi_amount_withdrawn_so_far_internal_pattern_2": withdrawn_so_far_new,
             "staking_roi_next_withdrawal_duration_ts": next_withdrawal_ts,
-            "update_staking_request_timestamp": Math.floor(Date.now() / 1000),
+            "staking_roi_last_withdrawal_ts_internal_pattern_2": currentTime,
+            "update_staking_request_timestamp": currentTime,
+            "staking_roi_amount_remaining_to_be_paid": normal_remaining_to_be_paid_new,
+            "staking_roi_amount_withdrawn_so_far": normal_withdrawn_so_far_new,
+            "staking_roi_next_withdrawal_duration_ts": next_withdrawal_ts,
+            "staking_roi_last_withdrawal_ts": currentTime,
+            "update_staking_request_timestamp": currentTime
+        };
+    } else {
+        return {
             "staking_roi_amount_remaining_to_be_paid": remaining_to_be_paid_new,
             "staking_roi_amount_withdrawn_so_far": withdrawn_so_far_new,
             "staking_roi_next_withdrawal_duration_ts": next_withdrawal_ts,
-            "update_staking_request_timestamp": Math.floor(Date.now() / 1000)
+            "staking_roi_last_withdrawal_ts": currentTime,
+            "update_staking_request_timestamp": currentTime
         };
     }
 }
