@@ -20,7 +20,7 @@ async function approveWithdrawalTransaction(transactionID, userID, metaData) {
             }
         });
 
-        const transactionStatus = transactionDetailsResponse.data.data.transaction_approval_status;
+        const transactionStatus = transactionDetailsResponse.data.data.transaction_status;
         if (transactionStatus !== "pending") {
             throw new Error(`Transaction is no longer on pending status (${transactionStatus})`);
         }
@@ -81,7 +81,7 @@ async function declineWithdrawalTransaction(transactionID, user_id_performing_re
             }
         });
 
-        const transactionStatus = transactionDetailsResponse.data.data.transaction_approval_status;
+        const transactionStatus = transactionDetailsResponse.data.data.transaction_status;
         if (transactionStatus !== "pending") {
             throw new Error(`Transaction is no longer on pending status (${transactionStatus})`);
         }

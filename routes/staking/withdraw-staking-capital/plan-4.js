@@ -277,7 +277,7 @@ router.post('/blockchain-external/:stakingTransactionID', async (req, res) => {
             return res.status(400).json({
                 status: false,
                 status_code: 400,
-                message: 'Invalid EVM address format',
+                message: `Invalid Withdrawal address format - ${blockchain_withdrawal_address_to}`,
                 error: {
                     message: `The withdrawal address "${blockchain_withdrawal_address_to}" is not a valid EVM address`,
                     recommendation: 'Provide a valid EVM address (0x followed by 40 hexadecimal characters)',
@@ -399,7 +399,7 @@ router.post('/blockchain-external/:stakingTransactionID', async (req, res) => {
             user_id: user_id,
             amount: staking_amount,
             wallet_id: staking_locked_wallet_id,
-            note: 'Plan 4 Staking Capital External Withdrawal Request',
+            note: 'Staking Capital Withdrawal Request',
             meta_data: {
                 staking_transaction_id: stakingTransactionID,
                 staking_plan_id: stakingMeta.staking_plan_id,
@@ -427,7 +427,7 @@ router.post('/blockchain-external/:stakingTransactionID', async (req, res) => {
             user_id: user_id,
             amount: staking_amount,
             wallet_id: staking_capital_payment_wallet_id,
-            note: 'Plan 4 Staking Capital External Withdrawal Credit',
+            note: 'Staking Capital Withdrawal Credit',
             meta_data: {
                 staking_transaction_id: stakingTransactionID,
                 staking_alt_transaction_id: debitResponse.data.data.transaction_id,
@@ -449,37 +449,7 @@ router.post('/blockchain-external/:stakingTransactionID', async (req, res) => {
             }
         });
 
-        // Step 3: Submit withdrawal request to external wallet
-        const withdrawalRequestUrl = `${MODULE1_STAKING_BASE_URL}/wp-json/nellalink/v2/smart-meta-manager/content`;
-        const withdrawalRequestRequestBody = {
-            blockchain_withdrawal_address_to: blockchain_withdrawal_address_to,
-            amount: staking_amount,
-            currency: staking_capital_payment_wallet_id,
-            transaction_status: 'pending',
-            transaction_approval_status: 'admin_pending',
-            transaction_action_type: 'external_wallet_withdrawal_request',
-            transaction_type_category: 'withdrawals',
-            transaction_processor: 'middleware',
-            transaction_external_processor: 'administrator',
-            transaction_requested_time: Date.now(),
-            transaction_requested_by: user_id,
-            staking_transaction_id: stakingTransactionID,
-            staking_plan_id: stakingMeta.staking_plan_id,
-            staking_plan_name: stakingMeta.staking_plan_name,
-            staking_capital_withdraw_debit_transaction_id: debitResponse.data.data.transaction_id,
-            staking_capital_withdraw_credit_transaction_id: creditResponse.data.data.transaction_id,
-            withdrawal_type: 'external_wallet',
-            withdrawal_source: 'staking_capital'
-        };
-
-        const withdrawalRequestResponse = await axios.post(withdrawalRequestUrl, withdrawalRequestRequestBody, {
-            headers: {
-                'x-api-key': MODULE1_STAKING_API_KEY,
-                'Authorization': `Bearer ${userBearerJWToken}`
-            }
-        });
-
-        // Step 4: Update staking meta with withdrawal information
+        // Step 3: Update staking meta with withdrawal information
         const currentTime = Math.floor(Date.now() / 1000);
         const updateMetaUrl = `${MODULE1_STAKING_BASE_URL}/wp-json/nellalink/v2/smart-meta-manager/content/${stakingTransactionID}`;
         
@@ -492,7 +462,7 @@ router.post('/blockchain-external/:stakingTransactionID', async (req, res) => {
             staking_roi_payment_endtime_ts: currentTime,
             staking_roi_payment_endtime_ts_internal_pattern_2: currentTime,
             blockchain_withdrawal_address_to: blockchain_withdrawal_address_to,
-            withdrawal_request_transaction_id: withdrawalRequestResponse.data.data.id
+            withdrawal_request_transaction_id: withdrawalDebitResponse.data.data.transaction_id
         };
 
         const updateMetaResponse = await axios.put(updateMetaUrl, updateMetaRequestBody, {
@@ -502,6 +472,43 @@ router.post('/blockchain-external/:stakingTransactionID', async (req, res) => {
             }
         });
 
+
+        // Step 4: Submit withdrawal request to external wallet (debit transaction)
+        const withdrawalDebitUrl = `${MODULE1_STAKING_BASE_URL}/wp-json/rimplenet/v1/debits`;
+        const withdrawalDebitRequestBody = {
+            request_id: `external_withdrawal_request_${request_id}`,
+            user_id: user_id,
+            amount: staking_amount,
+            wallet_id: staking_capital_payment_wallet_id,
+            note: `External Wallet Withdrawal Request for Plan 4 Staking`,
+            meta_data: {
+                blockchain_withdrawal_address_to: blockchain_withdrawal_address_to,
+                transaction_status: 'pending',
+                transaction_approval_status: 'admin_pending',
+                transaction_action_type: 'withdrawal_request',
+                transaction_type_category: 'withdrawals',
+                transaction_processor: 'middleware',
+                transaction_external_processor: 'administrator',
+                transaction_requested_time: Date.now(),
+                transaction_requested_by: user_id,
+                staking_transaction_id: stakingTransactionID,
+                staking_plan_id: stakingMeta.staking_plan_id,
+                staking_plan_name: stakingMeta.staking_plan_name,
+                staking_capital_withdraw_debit_transaction_id: debitResponse.data.data.transaction_id,
+                staking_capital_withdraw_credit_transaction_id: creditResponse.data.data.transaction_id,
+                withdrawal_type: 'external_wallet',
+                withdrawal_source: 'staking_capital_plan_4'
+            }
+        };
+
+        const withdrawalDebitResponse = await axios.post(withdrawalDebitUrl, withdrawalDebitRequestBody, {
+            headers: {
+                'x-api-key': MODULE1_STAKING_API_KEY,
+                'Authorization': `Bearer ${userBearerJWToken}`
+            }
+        });
+
+        
         // Success response
         return res.status(200).json({
             status: true,
@@ -518,7 +525,7 @@ router.post('/blockchain-external/:stakingTransactionID', async (req, res) => {
                 capital_withdrawal_time_formatted: new Date(currentTime * 1000).toLocaleString(),
                 debit_transaction_id: debitResponse.data.data.transaction_id,
                 credit_transaction_id: creditResponse.data.data.transaction_id,
-                withdrawal_request_transaction_id: withdrawalRequestResponse.data.data.id,
+                withdrawal_request_transaction_id: withdrawalDebitResponse.data.data.transaction_id,
                 roi_payment_endtime_updated: currentTime,
                 roi_payment_endtime_updated_formatted: new Date(currentTime * 1000).toLocaleString(),
                 note: 'Plan 4 allows instant capital withdrawal to external wallet. ROI accumulation stops at capital withdrawal time.',
