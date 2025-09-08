@@ -26,22 +26,22 @@ const {
 // Import TIMESTAMP_INTERVAL_VALUES from utils
 const { TIMESTAMP_INTERVAL_VALUES } = require('../utils');
 
-// Environment variables for Plan 4
+// Environment variables for Plan 5
 const MODULE1_STAKING_BASE_URL = process.env.MODULE1_STAKING_BASE_URL;
 const MODULE1_STAKING_API_KEY = process.env.MODULE1_STAKING_API_KEY;
-const MODULE1_STAKING_PLAN_4_NAME = process.env.MODULE1_STAKING_PLAN_4_NAME || 'Plan 4';
+const MODULE1_STAKING_PLAN_5_NAME = process.env.MODULE1_STAKING_PLAN_5_NAME || 'Plan 5';
 const MODULE1_STAKING_ALLOWED_WALLET_ID = process.env.MODULE1_STAKING_ALLOWED_WALLET_ID;
 
-// Plan 4 specific environment variables
-const MODULE1_STAKING_PLAN_4_CAPITAL_DURATION = process.env.MODULE1_STAKING_PLAN_4_CAPITAL_DURATION;
-const MODULE1_STAKING_PLAN_4_ROI_PAYMENT_INTERVAL = process.env.MODULE1_STAKING_PLAN_4_ROI_PAYMENT_INTERVAL;
-const MODULE1_STAKING_PLAN_4_ROI_PAYMENT_DURATION = process.env.MODULE1_STAKING_PLAN_4_ROI_PAYMENT_DURATION;
-const MODULE1_STAKING_PLAN_4_ROI_PAYMENT_PERCENTAGE_OF_STAKING_AMOUNT_PER_INTERVAL = process.env.MODULE1_STAKING_PLAN_4_ROI_PAYMENT_PERCENTAGE_OF_STAKING_AMOUNT_PER_INTERVAL;
-const MODULE1_STAKING_PLAN_4_ROI_PAYMENT_PATTERN = process.env.MODULE1_STAKING_PLAN_4_ROI_PAYMENT_PATTERN;
-const MODULE1_STAKING_PLAN_4_ROI_PAYMENT_WALLET_ID = process.env.MODULE1_STAKING_PLAN_4_ROI_PAYMENT_WALLET_ID;
-const MODULE1_STAKING_PLAN_4_ROI_WITHDRAWAL_INTERVAL = process.env.MODULE1_STAKING_PLAN_4_ROI_WITHDRAWAL_INTERVAL;
-const MODULE1_STAKING_PLAN_4_ROI_FIRST_WITHDRAWAL_DURATION = process.env.MODULE1_STAKING_PLAN_4_ROI_FIRST_WITHDRAWAL_DURATION;
-const MODULE1_STAKING_PLAN_4_ALLOWED_STAKING_WALLET_ID = process.env.MODULE1_STAKING_PLAN_4_ALLOWED_STAKING_WALLET_ID;
+// Plan 5 specific environment variables
+const MODULE1_STAKING_PLAN_5_CAPITAL_DURATION = process.env.MODULE1_STAKING_PLAN_5_CAPITAL_DURATION;
+const MODULE1_STAKING_PLAN_5_ROI_PAYMENT_INTERVAL = process.env.MODULE1_STAKING_PLAN_5_ROI_PAYMENT_INTERVAL;
+const MODULE1_STAKING_PLAN_5_ROI_PAYMENT_DURATION = process.env.MODULE1_STAKING_PLAN_5_ROI_PAYMENT_DURATION;
+const MODULE1_STAKING_PLAN_5_ROI_PAYMENT_PERCENTAGE_OF_STAKING_AMOUNT_PER_INTERVAL = process.env.MODULE1_STAKING_PLAN_5_ROI_PAYMENT_PERCENTAGE_OF_STAKING_AMOUNT_PER_INTERVAL;
+const MODULE1_STAKING_PLAN_5_ROI_PAYMENT_PATTERN = process.env.MODULE1_STAKING_PLAN_5_ROI_PAYMENT_PATTERN;
+const MODULE1_STAKING_PLAN_5_ROI_PAYMENT_WALLET_ID = process.env.MODULE1_STAKING_PLAN_5_ROI_PAYMENT_WALLET_ID;
+const MODULE1_STAKING_PLAN_5_ROI_WITHDRAWAL_INTERVAL = process.env.MODULE1_STAKING_PLAN_5_ROI_WITHDRAWAL_INTERVAL;
+const MODULE1_STAKING_PLAN_5_ROI_FIRST_WITHDRAWAL_DURATION = process.env.MODULE1_STAKING_PLAN_5_ROI_FIRST_WITHDRAWAL_DURATION;
+const MODULE1_STAKING_PLAN_5_ALLOWED_STAKING_WALLET_ID = process.env.MODULE1_STAKING_PLAN_5_ALLOWED_STAKING_WALLET_ID;
 
 router.post('/', async function(req, res, next) {
     try {
@@ -61,18 +61,18 @@ router.post('/', async function(req, res, next) {
 
         // Use TIMESTAMP_INTERVAL_VALUES imported from utils.js
 
-        // Plan 4 Configuration (Ultra-Fast Staking)
-        const staking_plan_id = "plan_4";
-        const staking_plan_name = MODULE1_STAKING_PLAN_4_NAME;
+        // Plan 5 Configuration
+        const staking_plan_id = "plan_5";
+        const staking_plan_name = MODULE1_STAKING_PLAN_5_NAME;
 
-        // Plan 4 specific parameters
-        const roi_payment_percentage_of_staking_amount = MODULE1_STAKING_PLAN_4_ROI_PAYMENT_PERCENTAGE_OF_STAKING_AMOUNT_PER_INTERVAL;
-        const roi_payment_interval = MODULE1_STAKING_PLAN_4_ROI_PAYMENT_INTERVAL; 
-        const roi_payment_duration = MODULE1_STAKING_PLAN_4_ROI_PAYMENT_DURATION;
-        const roi_withdrawal_interval = MODULE1_STAKING_PLAN_4_ROI_WITHDRAWAL_INTERVAL;
-        const roi_payment_wallet_id = MODULE1_STAKING_PLAN_4_ROI_PAYMENT_WALLET_ID;
-        const roi_first_withdrawal_duration = MODULE1_STAKING_PLAN_4_ROI_FIRST_WITHDRAWAL_DURATION;
-        const staking_capital_locked_duration = MODULE1_STAKING_PLAN_4_CAPITAL_DURATION; 
+        // Plan 5 specific parameters
+        const roi_payment_percentage_of_staking_amount = MODULE1_STAKING_PLAN_5_ROI_PAYMENT_PERCENTAGE_OF_STAKING_AMOUNT_PER_INTERVAL;
+        const roi_payment_interval = MODULE1_STAKING_PLAN_5_ROI_PAYMENT_INTERVAL; 
+        const roi_payment_duration = MODULE1_STAKING_PLAN_5_ROI_PAYMENT_DURATION;
+        const roi_withdrawal_interval = MODULE1_STAKING_PLAN_5_ROI_WITHDRAWAL_INTERVAL;
+        const roi_payment_wallet_id = MODULE1_STAKING_PLAN_5_ROI_PAYMENT_WALLET_ID;
+        const roi_first_withdrawal_duration = MODULE1_STAKING_PLAN_5_ROI_FIRST_WITHDRAWAL_DURATION;
+        const staking_capital_locked_duration = MODULE1_STAKING_PLAN_5_CAPITAL_DURATION; 
         
         // Validate ROI payment interval
         const intervalValidation = validateROIPaymentInterval(roi_payment_interval, staking_plan_name);
@@ -81,10 +81,10 @@ router.post('/', async function(req, res, next) {
         }
 
         const staking_capital_locked_duration_formatted_name = `${staking_capital_locked_duration} ` + TIMESTAMP_INTERVAL_VALUES[roi_payment_interval].name_plural;
-        const roi_payment_pattern = MODULE1_STAKING_PLAN_4_ROI_PAYMENT_PATTERN;
+        const roi_payment_pattern = MODULE1_STAKING_PLAN_5_ROI_PAYMENT_PATTERN;
 
         // Validate staking wallet ID
-        const stakingWalletValidation = validateStakingWalletId(wallet_id, MODULE1_STAKING_PLAN_4_ALLOWED_STAKING_WALLET_ID);
+        const stakingWalletValidation = validateStakingWalletId(wallet_id, MODULE1_STAKING_PLAN_5_ALLOWED_STAKING_WALLET_ID);
         if (stakingWalletValidation.error) {
             return res.status(400).send(stakingWalletValidation.error);
         }
@@ -168,4 +168,4 @@ router.post('/', async function(req, res, next) {
     }
 });
 
-module.exports = router; 
+module.exports = router;

@@ -44,23 +44,16 @@ const {
     formatRemainingTime
 } = require('../utils');
 
-const MODULE1_STAKING_PLAN_4_NAME = process.env.MODULE1_STAKING_PLAN_4_NAME || 'Plan 4';
+const MODULE1_STAKING_PLAN_5_NAME = process.env.MODULE1_STAKING_PLAN_5_NAME || 'Plan 5';
 
 /**
- * ${MODULE1_STAKING_PLAN_4_NAME} Staking ROI Withdrawal
- * 
- * Request Body:
- * - request_id: Unique request identifier
- * - user_id: User ID
- * - amount_to_withdraw: Amount to withdraw (string)
- * 
- * Headers:
- * - Authorization: Bearer JWT token
+ * ${MODULE1_STAKING_PLAN_5_NAME} Staking ROI Withdrawal
+ * Internal withdrawal to user's main wallet
  */
-router.post('/:stakingTransactionID', async function(req, res, next) {
+router.post('/:stakingTransactionID', async (req, res) => {
     try {
         const stakingTransactionID = req.params.stakingTransactionID;
-        const { request_id, user_id, amount_to_withdraw } = req.body;   
+        const { request_id, user_id, amount_to_withdraw } = req.body;
 
         // Validate JWT token
         const jwtValidation = validateJWTToken(req, res);
@@ -81,9 +74,9 @@ router.post('/:stakingTransactionID', async function(req, res, next) {
         // Fetch and validate staking meta data
         const stakingMetaData = await fetchAndValidateStakingMeta(stakingTransactionID, userBearerJWToken);
 
-        // Validate Plan 4 staking
-        const plan4Validation = validateStakingPlan(stakingMetaData, "plan_4");
-        if (plan4Validation.error) return res.status(400).json(plan4Validation.error);
+        // Validate Plan 5 staking
+        const plan5Validation = validateStakingPlan(stakingMetaData, "plan_5");
+        if (plan5Validation.error) return res.status(400).json(plan5Validation.error);
 
         // Calculate staking metrics using utils - use pattern-specific calculation
         let stakingMetrics;
@@ -91,13 +84,13 @@ router.post('/:stakingTransactionID', async function(req, res, next) {
             // For pattern_2, calculate using pattern-specific fields
             const staking_roi_payment_endtime_ts = parseInt(stakingMetaData.staking_roi_payment_endtime_ts_internal_pattern_2);
             
-            // For Plan 4, if capital has been withdrawn, use the capital withdrawal time as the effective end time
+            // For Plan 5, if capital has been withdrawn, use the capital withdrawal time as the effective end time
             const stakingPlanId = stakingMetaData.staking_plan_id;
             const capitalWithdrawnAt = parseInt(stakingMetaData.staking_capital_withdrawn_at);
             let effectiveEndTime = staking_roi_payment_endtime_ts;
             
-            if (stakingPlanId === 'plan_4' && capitalWithdrawnAt && capitalWithdrawnAt > 0) {
-                // For Plan 4 with capital withdrawn, ROI stops at capital withdrawal time
+            if (stakingPlanId === 'plan_5' && capitalWithdrawnAt && capitalWithdrawnAt > 0) {
+                // For Plan 5 with capital withdrawn, ROI stops at capital withdrawal time
                 effectiveEndTime = Math.min(staking_roi_payment_endtime_ts, capitalWithdrawnAt);
             }
             
@@ -130,15 +123,20 @@ router.post('/:stakingTransactionID', async function(req, res, next) {
             return res.status(400).send(insufficientBalanceError);
         }
 
-        // Validate withdrawal amount
+        // 4. Validate withdrawal amount
         const validationError = validateWithdrawalAmount(amount_to_withdraw, stakingMetrics);
         if (validationError) {
             return res.status(400).send(validationError);
         }
 
-        
+        // Check for pending transactions
+        const transactionExists = await checkPendingTransactions(user_id, userBearerJWToken);
+        if (transactionExists === "yes") {
+            const pendingError = buildPendingTransactionError(transactionExists);
+            return res.status(400).send(pendingError);
+        }
 
-        // Step 1: Debit the ROI wallet
+        // Step 1: Debit the ROI amount from user's main wallet
         const debitRequestBody = buildRoiDebitRequestBody(request_id, user_id, amount_to_withdraw, stakingTransactionID, stakingMetaData, stakingMetrics);
         const debitResponse = await createDebitTransaction(userBearerJWToken, debitRequestBody);
 
@@ -162,17 +160,22 @@ router.post('/:stakingTransactionID', async function(req, res, next) {
             currentTime,
             debitResponse.data.data.transaction_id,
             creditResponse.data.data.transaction_id,
-            false
+            false, // isExternal
+            null, // blockchain_withdrawal_address_to
+            null // withdrawalRequestTransactionId
         );
+
         return res.status(200).send(successResponse);
 
     } catch (error) {
-        console.error(`${MODULE1_STAKING_PLAN_4_NAME} ROI Withdrawal Error:`, error);
-        return handleTryCatchError(res, error);
+        return handleTryCatchError(res, error, `${MODULE1_STAKING_PLAN_5_NAME} ROI withdrawal`);
     }
 });
 
-// POST /staking/withdraw-staking-roi/plan-4/blockchain-external/:stakingTransactionID
+/**
+ * ${MODULE1_STAKING_PLAN_5_NAME} Staking ROI Withdrawal - External
+ * Withdrawal to external blockchain wallet
+ */
 router.post('/blockchain-external/:stakingTransactionID', async (req, res) => {
     try {
         const stakingTransactionID = req.params.stakingTransactionID;
@@ -203,9 +206,9 @@ router.post('/blockchain-external/:stakingTransactionID', async (req, res) => {
         // Fetch and validate staking meta data
         const stakingMetaData = await fetchAndValidateStakingMeta(stakingTransactionID, userBearerJWToken);
 
-        // Validate Plan 4 staking
-        const plan4Validation = validateStakingPlan(stakingMetaData, "plan_4");
-        if (plan4Validation.error) return res.status(400).json(plan4Validation.error);
+        // Validate Plan 5 staking
+        const plan5Validation = validateStakingPlan(stakingMetaData, "plan_5");
+        if (plan5Validation.error) return res.status(400).json(plan5Validation.error);
 
         // Calculate staking metrics using utils - use pattern-specific calculation
         let stakingMetrics;
@@ -213,13 +216,13 @@ router.post('/blockchain-external/:stakingTransactionID', async (req, res) => {
             // For pattern_2, calculate using pattern-specific fields
             const staking_roi_payment_endtime_ts = parseInt(stakingMetaData.staking_roi_payment_endtime_ts_internal_pattern_2);
             
-            // For Plan 4, if capital has been withdrawn, use the capital withdrawal time as the effective end time
+            // For Plan 5, if capital has been withdrawn, use the capital withdrawal time as the effective end time
             const stakingPlanId = stakingMetaData.staking_plan_id;
             const capitalWithdrawnAt = parseInt(stakingMetaData.staking_capital_withdrawn_at);
             let effectiveEndTime = staking_roi_payment_endtime_ts;
             
-            if (stakingPlanId === 'plan_4' && capitalWithdrawnAt && capitalWithdrawnAt > 0) {
-                // For Plan 4 with capital withdrawn, ROI stops at capital withdrawal time
+            if (stakingPlanId === 'plan_5' && capitalWithdrawnAt && capitalWithdrawnAt > 0) {
+                // For Plan 5 with capital withdrawn, ROI stops at capital withdrawal time
                 effectiveEndTime = Math.min(staking_roi_payment_endtime_ts, capitalWithdrawnAt);
             }
             
@@ -252,14 +255,13 @@ router.post('/blockchain-external/:stakingTransactionID', async (req, res) => {
             return res.status(400).send(insufficientBalanceError);
         }
 
-        // Validate withdrawal amount
+        // 4. Validate withdrawal amount
         const validationError = validateWithdrawalAmount(amount_to_withdraw, stakingMetrics);
         if (validationError) {
             return res.status(400).send(validationError);
         }
 
-        
-        // Perform transaction existence check
+        // Check for pending transactions
         const transactionExists = await checkPendingTransactions(user_id, userBearerJWToken);
         if (transactionExists === "yes") {
             const pendingError = buildPendingTransactionError(transactionExists);
@@ -310,13 +312,12 @@ router.post('/blockchain-external/:stakingTransactionID', async (req, res) => {
             blockchain_withdrawal_address_to,
             withdrawalDebitResponse.data.data.transaction_id
         );
+
         return res.status(200).send(successResponse);
 
     } catch (error) {
-        console.error(`${MODULE1_STAKING_PLAN_4_NAME} ROI External Withdrawal Error:`, error);
-        return handleTryCatchError(res, error);
+        return handleTryCatchError(res, error, `${MODULE1_STAKING_PLAN_5_NAME} ROI external withdrawal`);
     }
 });
-
 
 module.exports = router;
