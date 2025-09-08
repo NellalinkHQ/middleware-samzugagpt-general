@@ -19,7 +19,7 @@ try {
     if (MODULE1_CRYPTOCURRENCY_BSCSCAN_NETWORK === "testnet") {
         web3 = new Web3(MODULE1_CRYPTOCURRENCY_NODE_PROVIDER_HTTP_TESTNET);
     } else {
-       // web3 = new Web3(MODULE1_CRYPTOCURRENCY_NODE_PROVIDER_HTTP_MAINNET);
+       web3 = new Web3(MODULE1_CRYPTOCURRENCY_NODE_PROVIDER_HTTP_MAINNET);
     }
 } catch (error) {
     console.error("Error initializing Web3 for EVM validation:", error.message);

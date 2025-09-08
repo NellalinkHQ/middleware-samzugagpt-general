@@ -170,6 +170,9 @@ router.post('/blockchain-external/:stakingTransactionID', async (req, res) => {
         const timingValidation = validateCapitalWithdrawalTiming(stakingMeta, stakingTransactionID);
         if (timingValidation.error) return res.status(400).send(timingValidation.error);
 
+        // Extract required fields first
+        const { staking_capital_payment_wallet_id, staking_amount, user_id, staking_locked_wallet_id } = extractStakingFields(stakingMeta);
+
         // Check if external withdrawal has already been processed
         const externalWithdrawalExists = await checkExternalWithdrawalExists(stakingTransactionID, user_id);
         if (externalWithdrawalExists) {
@@ -187,9 +190,6 @@ router.post('/blockchain-external/:stakingTransactionID', async (req, res) => {
             const pendingError = buildPendingTransactionError(transactionExists);
             return res.status(400).send(pendingError);
         }
-
-        // Extract required fields
-        const { staking_capital_payment_wallet_id, staking_amount, user_id, staking_locked_wallet_id } = extractStakingFields(stakingMeta);
 
         // Step 1: Debit the locked staking wallet
         const debitRequestBody = buildCapitalDebitRequestBody(request_id, user_id, stakingTransactionID, staking_amount, staking_locked_wallet_id, stakingMeta, true);

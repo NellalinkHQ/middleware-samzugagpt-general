@@ -41,6 +41,7 @@ const BEP20_TOKEN_CONTRACTS = {
     // Mainnet contracts
     mainnet: {
         'usdt': { address: '0x55d398326f99059fF775485246999027B3197955', decimals: 18 },
+        'usdt_staking_interest': { address: '0x55d398326f99059fF775485246999027B3197955', decimals: 18 },
         'usdc': { address: '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d', decimals: 18 }, // USDC on BSC
         'busd': { address: '0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56', decimals: 18 }, // BUSD on BSC
         'dai': { address: '0x1AF3F329e8BE154074D8769D1FFa4eE058B1DBc3', decimals: 18 }, // DAI on BSC
@@ -124,7 +125,7 @@ router.put('/approve/:transactionID', async function(req, res, next) {
             return res.status(400).json({
                 status: false,
                 status_code: 400,
-                message: "Invalid EVM address format",
+                message: "Invalid wallet address format",
                 error: {
                     message: `The withdrawal address "${blockchain_withdrawal_address_to}" is not a valid EVM address`,
                     recommendation: "Provide a valid EVM address (0x followed by 40 hexadecimal characters)",
