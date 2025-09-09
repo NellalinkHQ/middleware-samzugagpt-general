@@ -29,7 +29,10 @@ const {
     buildExternalRoiWithdrawalExistsError,
     buildPendingTransactionError,
     buildInsufficientRoiBalanceError,
-    invalidateStakingMetaCache
+    invalidateStakingMetaCache,
+    checkUserFeeBalance,
+    deductUserFee,
+    creditFeeToFeeUser
 } = require('./utils');
 
 // Import the new utils
@@ -45,6 +48,9 @@ const {
 } = require('../utils');
 
 const MODULE1_STAKING_PLAN_5_NAME = process.env.MODULE1_STAKING_PLAN_5_NAME || 'Plan 5';
+
+// Import get-staking utils for dynamic fee configuration
+const { getStakingPlanDataFromAPI } = require('../get-staking/utils');
 
 /**
  * ${MODULE1_STAKING_PLAN_5_NAME} Staking ROI Withdrawal
@@ -127,6 +133,36 @@ router.post('/:stakingTransactionID', async (req, res) => {
         const validationError = validateWithdrawalAmount(amount_to_withdraw, stakingMetrics);
         if (validationError) {
             return res.status(400).send(validationError);
+        }
+
+        // Get dynamic fee configuration for internal ROI withdrawal
+        const planData = await getStakingPlanDataFromAPI('plan_5');
+        if (!planData.status) {
+            return res.status(400).json(planData.error);
+        }
+
+        const fee_amount = planData.data.roi_withdrawal_fee_internal;
+        const fee_wallet = planData.data.roi_withdrawal_fee_wallet;
+        
+        // Skip fee processing if fee is zero
+        if (parseFloat(fee_amount) > 0) {
+            // Check if user has sufficient balance for fee
+            const feeBalanceCheck = await checkUserFeeBalance(userBearerJWToken, fee_amount, fee_wallet, user_id);
+            if (!feeBalanceCheck.status) {
+                return res.status(400).json(feeBalanceCheck.error);
+            }
+
+            // Deduct the fee
+            const feeDeduction = await deductUserFee(userBearerJWToken, fee_amount, fee_wallet, user_id, stakingTransactionID);
+            if (!feeDeduction.status) {
+                return res.status(400).json(feeDeduction.error);
+            }
+
+            // Credit the fee to fee user 
+            const feeCredit = await creditFeeToFeeUser(userBearerJWToken, fee_amount, fee_wallet, stakingTransactionID, user_id);
+            if (!feeCredit.status) {
+                return res.status(400).json(feeCredit.error);
+            }
         }
 
         // Step 1: Debit the ROI amount from user's main wallet
@@ -252,6 +288,36 @@ router.post('/blockchain-external/:stakingTransactionID', async (req, res) => {
         const validationError = validateWithdrawalAmount(amount_to_withdraw, stakingMetrics);
         if (validationError) {
             return res.status(400).send(validationError);
+        }
+
+        // Get dynamic fee configuration for external ROI withdrawal
+        const planData = await getStakingPlanDataFromAPI('plan_5');
+        if (!planData.status) {
+            return res.status(400).json(planData.error);
+        }
+
+        const fee_amount = planData.data.roi_withdrawal_fee_external;
+        const fee_wallet = planData.data.roi_withdrawal_fee_wallet;
+        
+        // Skip fee processing if fee is zero
+        if (parseFloat(fee_amount) > 0) {
+            // Check if user has sufficient balance for fee
+            const feeBalanceCheck = await checkUserFeeBalance(userBearerJWToken, fee_amount, fee_wallet, user_id);
+            if (!feeBalanceCheck.status) {
+                return res.status(400).json(feeBalanceCheck.error);
+            }
+
+            // Deduct the fee
+            const feeDeduction = await deductUserFee(userBearerJWToken, fee_amount, fee_wallet, user_id, stakingTransactionID);
+            if (!feeDeduction.status) {
+                return res.status(400).json(feeDeduction.error);
+            }
+
+            // Credit the fee to fee user
+            const feeCredit = await creditFeeToFeeUser(userBearerJWToken, fee_amount, fee_wallet, stakingTransactionID, user_id);
+            if (!feeCredit.status) {
+                return res.status(400).json(feeCredit.error);
+            }
         }
 
         // Check for pending transactions

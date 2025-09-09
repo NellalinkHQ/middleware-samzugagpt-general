@@ -29,7 +29,10 @@ const {
     buildExternalRoiWithdrawalExistsError,
     buildPendingTransactionError,
     buildInsufficientRoiBalanceError,
-    invalidateStakingMetaCache
+    invalidateStakingMetaCache,
+    checkUserFeeBalance,
+    deductUserFee,
+    creditFeeToFeeUser
 } = require('./utils');
 
 // Import the new utils
@@ -45,6 +48,9 @@ const {
 } = require('../utils');
 
 const MODULE1_STAKING_PLAN_4_NAME = process.env.MODULE1_STAKING_PLAN_4_NAME || 'Plan 4';
+
+// Import get-staking utils for dynamic fee configuration
+const { getStakingPlanDataFromAPI } = require('../get-staking/utils');
 
 /**
  * ${MODULE1_STAKING_PLAN_4_NAME} Staking ROI Withdrawal
@@ -136,7 +142,35 @@ router.post('/:stakingTransactionID', async function(req, res, next) {
             return res.status(400).send(validationError);
         }
 
+        // Get dynamic fee configuration for internal ROI withdrawal
+        const planData = await getStakingPlanDataFromAPI('plan_4');
+        if (!planData.status) {
+            return res.status(400).json(planData.error);
+        }
+
+        const fee_amount = planData.data.roi_withdrawal_fee_internal;
+        const fee_wallet = planData.data.roi_withdrawal_fee_wallet;
         
+        // Skip fee processing if fee is zero
+        if (parseFloat(fee_amount) > 0) {
+            // Check if user has sufficient balance for fee
+            const feeBalanceCheck = await checkUserFeeBalance(userBearerJWToken, fee_amount, fee_wallet, user_id);
+            if (!feeBalanceCheck.status) {
+                return res.status(400).json(feeBalanceCheck.error);
+            }
+
+            // Deduct the fee
+            const feeDeduction = await deductUserFee(userBearerJWToken, fee_amount, fee_wallet, user_id, stakingTransactionID);
+            if (!feeDeduction.status) {
+                return res.status(400).json(feeDeduction.error);
+            }
+
+            // Credit the fee to fee user 
+            const feeCredit = await creditFeeToFeeUser(userBearerJWToken, fee_amount, fee_wallet, stakingTransactionID, user_id);
+            if (!feeCredit.status) {
+                return res.status(400).json(feeCredit.error);
+            }
+        }
 
         // Step 1: Debit the ROI wallet
         const debitRequestBody = buildRoiDebitRequestBody(request_id, user_id, amount_to_withdraw, stakingTransactionID, stakingMetaData, stakingMetrics);
@@ -258,6 +292,35 @@ router.post('/blockchain-external/:stakingTransactionID', async (req, res) => {
             return res.status(400).send(validationError);
         }
 
+        // Get dynamic fee configuration for external ROI withdrawal
+        const planData = await getStakingPlanDataFromAPI('plan_4');
+        if (!planData.status) {
+            return res.status(400).json(planData.error);
+        }
+
+        const fee_amount = planData.data.roi_withdrawal_fee_external;
+        const fee_wallet = planData.data.roi_withdrawal_fee_wallet;
+        
+        // Skip fee processing if fee is zero
+        if (parseFloat(fee_amount) > 0) {
+            // Check if user has sufficient balance for fee
+            const feeBalanceCheck = await checkUserFeeBalance(userBearerJWToken, fee_amount, fee_wallet, user_id);
+            if (!feeBalanceCheck.status) {
+                return res.status(400).json(feeBalanceCheck.error);
+            }
+
+            // Deduct the fee
+            const feeDeduction = await deductUserFee(userBearerJWToken, fee_amount, fee_wallet, user_id, stakingTransactionID);
+            if (!feeDeduction.status) {
+                return res.status(400).json(feeDeduction.error);
+            }
+
+            // Credit the fee to fee user
+            const feeCredit = await creditFeeToFeeUser(userBearerJWToken, fee_amount, fee_wallet, stakingTransactionID, user_id);
+            if (!feeCredit.status) {
+                return res.status(400).json(feeCredit.error);
+            }
+        }
         
         // Perform transaction existence check
         const transactionExists = await checkPendingTransactions(user_id, userBearerJWToken);

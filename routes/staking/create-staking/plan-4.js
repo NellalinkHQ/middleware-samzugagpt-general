@@ -11,8 +11,6 @@ const { handleTryCatchError } = require('../../../middleware-utils/custom-try-ca
 // Import shared utilities
 const {
     validateJWTToken,
-    validateWalletId,
-    validateStakingWalletId,
     validateROIPaymentInterval,
     checkUserWalletBalance,
     createStakingDebitTransaction,
@@ -20,11 +18,15 @@ const {
     buildStakingCreditRequestBody,
     addPatternSpecificMetadata,
     createStakingCreditTransaction,
-    buildStakingSuccessResponse
+    buildStakingSuccessResponse,
+    validateCoreStakingParameters
 } = require('./utils');
 
 // Import TIMESTAMP_INTERVAL_VALUES from utils
 const { TIMESTAMP_INTERVAL_VALUES } = require('../utils');
+
+// Import get-staking utils for dynamic validation
+const { getStakingPlanDataFromAPI } = require('../get-staking/utils');
 
 // Environment variables for Plan 4
 const MODULE1_STAKING_BASE_URL = process.env.MODULE1_STAKING_BASE_URL;
@@ -53,12 +55,6 @@ router.post('/', async function(req, res, next) {
         if (jwtValidation.error) return jwtValidation.error;
         const { userBearerJWToken } = jwtValidation;
 
-        // Validate wallet ID
-        const walletValidation = validateWalletId(wallet_id);
-        if (walletValidation.error) {
-            return res.status(400).send(walletValidation.error);
-        }
-
         // Use TIMESTAMP_INTERVAL_VALUES imported from utils.js
 
         // Plan 4 Configuration (Ultra-Fast Staking)
@@ -83,12 +79,17 @@ router.post('/', async function(req, res, next) {
         const staking_capital_locked_duration_formatted_name = `${staking_capital_locked_duration} ` + TIMESTAMP_INTERVAL_VALUES[roi_payment_interval].name_plural;
         const roi_payment_pattern = MODULE1_STAKING_PLAN_4_ROI_PAYMENT_PATTERN;
 
-        // Validate staking wallet ID
-        const stakingWalletValidation = validateStakingWalletId(wallet_id, MODULE1_STAKING_PLAN_4_ALLOWED_STAKING_WALLET_ID);
-        if (stakingWalletValidation.error) {
-            return res.status(400).send(stakingWalletValidation.error);
+        // Get dynamic staking limits for the specific wallet
+        const planData = await getStakingPlanDataFromAPI('plan_4');
+        if (!planData.status) {
+            return res.status(400).json(planData.error);
         }
 
+        // Validate function like min and max staking amount using utility function
+        const coreStakingValidation = validateCoreStakingParameters(wallet_id, staking_amount, planData, MODULE1_STAKING_PLAN_4_NAME);
+        if (coreStakingValidation.error) {
+            return res.status(400).send(coreStakingValidation.error);
+        }
 
         // Proceed with the staking process
         // Step 1: Check balance of user
@@ -133,12 +134,15 @@ router.post('/', async function(req, res, next) {
         );
 
         // Add pattern-specific metadata if needed
+        const exchange_rate_at_time_of_staking = planData.data[`exchange_rate_${wallet_id}_to_usdt_staking_interest`];
         creditRequestBody = addPatternSpecificMetadata(
             creditRequestBody,
             roi_payment_pattern,
             stakingParams,
             wallet_id,
-            roi_payment_wallet_id
+            roi_payment_wallet_id,
+            exchange_rate_at_time_of_staking,
+            staking_amount
         );
 
         // Step 4: Create credit transaction

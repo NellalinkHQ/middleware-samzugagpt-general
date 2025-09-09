@@ -254,14 +254,13 @@ function buildStakingCreditRequestBody(request_id, user_id, staking_amount, wall
 /**
  * Add pattern-specific metadata for internal_pattern_2
  */
-function addPatternSpecificMetadata(creditRequestBody, roi_payment_pattern, stakingParams, wallet_id, roi_payment_wallet_id) {
+function addPatternSpecificMetadata(creditRequestBody, roi_payment_pattern, stakingParams, wallet_id, roi_payment_wallet_id, exchange_rate, staking_amount) {
     if (roi_payment_pattern === "internal_pattern_2") {
-        const MODULE1_STAKING_MAIN_WALLET_TO_ROI_PAYMENT_WALLET_EXCHANGE_RATE_TEMPORARY = parseFloat(process.env.MODULE1_STAKING_MAIN_WALLET_TO_ROI_PAYMENT_WALLET_EXCHANGE_RATE_TEMPORARY);
-        
-        const exchange_rate_at_time_of_staking = MODULE1_STAKING_MAIN_WALLET_TO_ROI_PAYMENT_WALLET_EXCHANGE_RATE_TEMPORARY;
+        // Use the provided exchange rate instead of hardcoded environment variable
+        const exchange_rate_at_time_of_staking = parseFloat(exchange_rate);
         const staking_roi_payment_wallet_id_internal_pattern_2 = `${roi_payment_wallet_id}_staking_interest`;
         
-        const staking_amount_with_pattern = stakingParams.staking_amount * exchange_rate_at_time_of_staking;
+        const staking_amount_with_pattern = staking_amount * exchange_rate_at_time_of_staking;
         const staking_roi_interval_payment_amount_with_pattern = stakingParams.staking_roi_interval_payment_amount * exchange_rate_at_time_of_staking;
         const staking_roi_amount_remaining_to_be_paid_with_pattern = stakingParams.staking_roi_amount_remaining_to_be_paid * exchange_rate_at_time_of_staking;
         const staking_roi_full_payment_amount_at_end_of_contract_with_pattern = stakingParams.staking_roi_full_payment_amount_at_end_of_contract * exchange_rate_at_time_of_staking;
@@ -272,6 +271,7 @@ function addPatternSpecificMetadata(creditRequestBody, roi_payment_pattern, stak
         creditRequestBody.meta_data[`exchange_rate_at_time_of_staking`] = exchange_rate_at_time_of_staking;
         creditRequestBody.meta_data[`exchange_rate_1_${wallet_id}_staking_locked_to_${roi_payment_wallet_id}_staking_interest_at_time_of_staking`] = exchange_rate_at_time_of_staking;
         creditRequestBody.meta_data[`staking_amount_${roi_payment_pattern}`] = staking_amount_with_pattern;
+        console.log(`Setting staking_amount_${roi_payment_pattern}:`, staking_amount_with_pattern);
         creditRequestBody.meta_data[`staking_roi_interval_payment_amount_${roi_payment_pattern}`] = staking_roi_interval_payment_amount_with_pattern;
         creditRequestBody.meta_data[`staking_roi_amount_remaining_to_be_paid_${roi_payment_pattern}`] = staking_roi_amount_remaining_to_be_paid_with_pattern;
         creditRequestBody.meta_data[`staking_roi_full_payment_amount_at_end_of_contract_${roi_payment_pattern}`] = staking_roi_full_payment_amount_at_end_of_contract_with_pattern;
@@ -331,10 +331,75 @@ function buildStakingSuccessResponse(staking_plan_id, staking_plan_name, staking
     };
 }
 
+/**
+ * Validate dynamic staking parameters from API data
+ * @param {string} wallet_id - The wallet ID to validate
+ * @param {string} staking_amount - The staking amount to validate
+ * @param {Object} planData - The plan data from getStakingPlanDataFromAPI
+ * @param {string} planName - The plan name for error messages
+ * @returns {Object} - Validation result with error if validation fails
+ */
+function validateCoreStakingParameters(wallet_id, staking_amount, planData, planName) {
+    // Validate supported staking wallet
+    const supported_staking_wallet = planData.data.supported_staking_wallet;
+    if (supported_staking_wallet) {
+        const supportedWallets = supported_staking_wallet.split(',').map(wallet => wallet.trim());
+        if (!supportedWallets.includes(wallet_id)) {
+            return {
+                error: {
+                    status: false,
+                    status_code: 400,
+                    message: `Wallet ${wallet_id} is not supported for this staking plan. Supported wallets: ${supported_staking_wallet}`,
+                    error: {
+                        wallet_id: wallet_id,
+                        supported_wallets: supported_staking_wallet,
+                        supported_wallets_array: supportedWallets
+                    }
+                }
+            };
+        }
+    }
+
+    // Validate staking amount against dynamic limits
+    const minimum_staking_amount = planData.data[`minimum_staking_amount_${wallet_id}`];
+    const maximum_staking_amount = planData.data[`maximum_staking_amount_${wallet_id}`];
+
+    if (minimum_staking_amount && parseFloat(staking_amount) < parseFloat(minimum_staking_amount)) {
+        return {
+            error: {
+                status: false,
+                status_code: 400,
+                message: `Staking amount is below minimum required for ${wallet_id}, staking amount: ${staking_amount}, minimum required: ${minimum_staking_amount}`,
+                error: {
+                    staking_amount: staking_amount,
+                    minimum_required: minimum_staking_amount,
+                    wallet_id: wallet_id
+                }
+            }
+        };
+    }
+
+    if (maximum_staking_amount && parseFloat(staking_amount) > parseFloat(maximum_staking_amount)) {
+        return {
+            error: {
+                status: false,
+                status_code: 400,
+                message: `Staking amount exceeds maximum allowed for ${wallet_id}, staking amount: ${staking_amount}, maximum allowed: ${maximum_staking_amount}`,
+                error: {
+                    staking_amount: staking_amount,
+                    maximum_allowed: maximum_staking_amount,
+                    wallet_id: wallet_id
+                }
+            }
+        };
+    }
+
+    // All validations passed
+    return { status: true };
+}
+
 module.exports = {
     validateJWTToken,
-    validateWalletId,
-    validateStakingWalletId,
     validateROIPaymentInterval,
     checkUserWalletBalance,
     createStakingDebitTransaction,
@@ -342,5 +407,6 @@ module.exports = {
     buildStakingCreditRequestBody,
     addPatternSpecificMetadata,
     createStakingCreditTransaction,
-    buildStakingSuccessResponse
+    buildStakingSuccessResponse,
+    validateCoreStakingParameters
 };

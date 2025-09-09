@@ -563,6 +563,231 @@ function buildTimingValidationError(stakingTransactionID, stakingMeta, timingDet
     };
 }
 
+
+// ============================================================================
+// FEE MANAGEMENT FUNCTIONS
+// ============================================================================
+
+/**
+ * Check if user has sufficient balance for withdrawal fee
+ * @param {string} userBearerJWToken - JWT token for API authentication
+ * @param {string} fee_amount - Amount of fee to check
+ * @param {string} fee_wallet - Wallet ID to check balance for
+ * @param {string} user_id - User ID for the balance check
+ * @returns {Object} Result object with success/error status
+ */
+async function checkUserFeeBalance(userBearerJWToken, fee_amount, fee_wallet, user_id) {
+    try {
+        const balanceCheckUrl = `${MODULE1_STAKING_BASE_URL}/wp-json/rimplenet/v1/user-wallet-balance?wallet_id=${fee_wallet}&user_id=${user_id}`;
+        
+        const response = await axios.get(balanceCheckUrl, {
+            headers: {
+                'x-api-key': MODULE1_STAKING_API_KEY,
+                'Authorization': `Bearer ${userBearerJWToken}`
+            }
+        });
+
+        if (response.data.status && response.data.data) {
+            // Extract user balance, defaulting to 0 if null or empty
+            const userBalance = parseFloat(response.data.data.wallet_balance_raw || 0);
+            const requiredFee = parseFloat(fee_amount);
+            
+            if (userBalance >= requiredFee) {
+                return {
+                    status: true,
+                    message: 'User has sufficient balance for fee',
+                    data: {
+                        user_balance: userBalance,
+                        required_fee: requiredFee,
+                        remaining_balance: userBalance - requiredFee,
+                        wallet_balance_raw: response.data.data.wallet_balance_raw,
+                        wallet_balance_formatted: response.data.data.wallet_balance_formatted
+                    }
+                };
+            } else {
+                return {
+                    status: false,
+                    error: {
+                        status: false,
+                        status_code: 400,
+                        message: `Insufficient balance for withdrawal fee. Required: ${requiredFee}, Available: ${userBalance}`,
+                        error: {
+                            msg: `Fee Amount ${requiredFee} is greater than Wallet balance ${userBalance}`,
+                            recommendation: "Fee Amount should not be greater than Wallet balance",
+                            required_fee: requiredFee,
+                            available_balance: userBalance,
+                            shortfall: requiredFee - userBalance,
+                            error_data: response.data.data
+                        }
+                    }
+                };
+            }
+        } else {
+            return {
+                status: false,
+                error: {
+                    status: false,
+                    status_code: 400,
+                    message: 'Failed to retrieve user balance for fee check',
+                    error: response.data
+                }
+            };
+        }
+    } catch (error) {
+        console.log("Error in checkUserFeeBalance:", error);
+        return {
+            status: false,
+            error: {
+                status: false,
+                status_code: 500,
+                message: 'Error checking user fee balance',
+                error: {
+                    message: error.message,
+                    details: error.response?.data || null
+                }
+            }
+        };
+    }
+}
+
+/**
+ * Deduct withdrawal fee from user's wallet
+ * @param {string} userBearerJWToken - JWT token for API authentication
+ * @param {string} fee_amount - Amount of fee to deduct
+ * @param {string} fee_wallet - Wallet ID to deduct from
+ * @param {string} user_id - User ID for the transaction
+ * @param {string} stakingTransactionID - Staking transaction ID for reference
+ * @returns {Object} Result object with success/error status
+ */
+async function deductUserFee(userBearerJWToken, fee_amount, fee_wallet, user_id, stakingTransactionID) {
+    try {
+        const feeDebitRequestBody = {
+            request_id: `fee_staking_capital_withdrawal_debit_${stakingTransactionID}`,
+            user_id: String(user_id),
+            amount: String(fee_amount),
+            wallet_id: String(fee_wallet),
+            note: `Fee - Staking Capital Withdrawal`,
+            meta_data: {
+                staking_transaction_id: String(stakingTransactionID),
+                transaction_action_type: 'staking_capital_withdrawal_fee',
+                transaction_type_category: 'fees',
+                transaction_processor: 'middleware',
+                transaction_approval_status: 'user_middleware_processed',
+                transaction_approval_method: 'middleware'
+            }
+        };
+
+        const response = await axios.post(`${MODULE1_STAKING_BASE_URL}/wp-json/rimplenet/v1/debits`, feeDebitRequestBody, {
+            headers: {
+                'x-api-key': MODULE1_STAKING_API_KEY,
+                'Authorization': `Bearer ${userBearerJWToken}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (response.data.status) {
+            return {
+                status: true,
+                message: 'Fee deducted successfully',
+                data: response.data.data
+            };
+        } else {
+            return {
+                status: false,
+                error: {
+                    status: false,
+                    status_code: 400,
+                    message: 'Failed to deduct withdrawal fee',
+                    error: response.data
+                }
+            };
+        }
+    } catch (error) {
+        return {
+            status: false,
+            error: {
+                status: false,
+                status_code: 500,
+                message: 'Error deducting withdrawal fee',
+                error: {
+                    message: error.message,
+                    details: error.response?.data || null
+                }
+            }
+        };
+    }
+}
+
+/**
+ * Credit the deducted fee to fee user
+ * @param {string} userBearerJWToken - JWT token for API authentication
+ * @param {string} fee_amount - Amount of fee to credit
+ * @param {string} fee_wallet - Wallet ID to credit to
+ * @param {string} stakingTransactionID - Staking transaction ID for reference
+ * @param {string} user_id - User ID who paid the fee
+ * @returns {Object} Result object with success/error status
+ */
+async function creditFeeToFeeUser(userBearerJWToken, fee_amount, fee_wallet, stakingTransactionID, user_id) {
+    try {
+        const creditRequestBody = {
+            request_id: `fee_staking_capital_withdrawal_credit_${stakingTransactionID}`,
+            user_id: 1, // Credit to fee user
+            amount: String(fee_amount),
+            wallet_id: String(fee_wallet),
+            note: `Fee - Staking Capital Withdrawal`,
+            meta_data: {
+                staking_transaction_id: String(stakingTransactionID),
+                user_id_fee_payer: String(user_id),
+                transaction_action_type: "fee_staking_capital_withdrawal",
+                transaction_type_category: "fee_staking_withdrawal",
+                transaction_external_processor: "middleware1_module1",
+                transaction_approval_status: "user_middleware_processed",
+                transaction_approval_method: "middleware"
+            }
+        };
+
+        const response = await axios.post(`${MODULE1_STAKING_BASE_URL}/wp-json/rimplenet/v1/credits`, creditRequestBody, {
+            headers: {
+                'x-api-key': MODULE1_STAKING_API_KEY,
+                'Authorization': `Bearer ${userBearerJWToken}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (response.data.status) {
+            return {
+                status: true,
+                message: 'Fee credited to user successfully',
+                data: response.data.data
+            };
+        } else {
+            return {
+                status: false,
+                error: {
+                    status: false,
+                    status_code: 400,
+                    message: 'Failed to credit fee to user',
+                    error: response.data
+                }
+            };
+        }
+    } catch (error) {
+        return {
+            status: false,
+            error: {
+                status: false,
+                status_code: 500,
+                message: 'Error crediting fee to user',
+                error: {
+                    message: error.message,
+                    details: error.response?.data || null
+                }
+            }
+        };
+    }
+}
+
+
 module.exports = {
     validateJWTToken,
     validateBlockchainWithdrawalAddress,
@@ -587,5 +812,8 @@ module.exports = {
     buildExternalWithdrawalExistsError,
     buildPendingTransactionError,
     buildTimingValidationError,
-    invalidateStakingMetaCache
+    invalidateStakingMetaCache,
+    checkUserFeeBalance,
+    deductUserFee,
+    creditFeeToFeeUser
 };

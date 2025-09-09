@@ -29,12 +29,18 @@ const {
     buildExternalWithdrawalExistsError,
     buildPendingTransactionError,
     buildTimingValidationError,
-    invalidateStakingMetaCache
+    invalidateStakingMetaCache,
+    checkUserFeeBalance,
+    deductUserFee,
+    creditFeeToFeeUser
 } = require('./utils');
 
 const MODULE1_STAKING_PLAN_4_NAME = process.env.MODULE1_STAKING_PLAN_4_NAME || 'Plan 4';
 const MODULE1_STAKING_BASE_URL = process.env.MODULE1_STAKING_BASE_URL;
 const MODULE1_STAKING_API_KEY = process.env.MODULE1_STAKING_API_KEY;
+
+// Import get-staking utils for dynamic fee configuration
+const { getStakingPlanDataFromAPI } = require('../get-staking/utils');
 
 // Initialize Web3 for EVM address validation
 let web3;
@@ -80,6 +86,36 @@ router.post('/:stakingTransactionID', async (req, res) => {
 
         // Extract required fields
         const { staking_capital_payment_wallet_id, staking_amount, user_id, staking_locked_wallet_id } = extractStakingFields(stakingMeta);
+
+        // Get dynamic fee configuration for internal withdrawal
+        const planData = await getStakingPlanDataFromAPI('plan_4');
+        if (!planData.status) {
+            return res.status(400).json(planData.error);
+        }
+
+        const fee_amount = planData.data.capital_withdrawal_fee_internal;
+        const fee_wallet = planData.data.capital_withdrawal_fee_wallet;
+        
+        // Skip fee processing if fee is zero
+        if (parseFloat(fee_amount) > 0) {
+            // Check if user has sufficient balance for fee
+            const feeBalanceCheck = await checkUserFeeBalance(userBearerJWToken, fee_amount, fee_wallet, user_id);
+            if (!feeBalanceCheck.status) {
+                return res.status(400).json(feeBalanceCheck.error);
+            }
+
+            // Deduct the fee
+            const feeDeduction = await deductUserFee(userBearerJWToken, fee_amount, fee_wallet, user_id, stakingTransactionID);
+            if (!feeDeduction.status) {
+                return res.status(400).json(feeDeduction.error);
+            }
+
+            // Credit the fee to fee user 
+            const feeCredit = await creditFeeToFeeUser(userBearerJWToken, fee_amount, fee_wallet, stakingTransactionID, user_id);
+            if (!feeCredit.status) {
+                return res.status(400).json(feeCredit.error);
+            }
+        }
 
         // Step 1: Debit the locked staking wallet
         const debitRequestBody = buildCapitalDebitRequestBody(request_id, user_id, stakingTransactionID, staking_amount, staking_locked_wallet_id, stakingMeta, false);
@@ -207,6 +243,36 @@ router.post('/blockchain-external/:stakingTransactionID', async (req, res) => {
         const timingValidation = validateCapitalWithdrawalTiming(stakingMeta, stakingTransactionID);
         if (timingValidation.error) return res.status(400).json(timingValidation.error);
 
+        // Get dynamic fee configuration for external withdrawal
+        const planData = await getStakingPlanDataFromAPI('plan_4');
+        if (!planData.status) {
+            return res.status(400).json(planData.error);
+        }
+
+        const fee_amount = planData.data.capital_withdrawal_fee_external;
+        const fee_wallet = planData.data.capital_withdrawal_fee_wallet;
+        
+        // Skip fee processing if fee is zero
+        if (parseFloat(fee_amount) > 0) {
+            // Check if user has sufficient balance for fee
+            const feeBalanceCheck = await checkUserFeeBalance(userBearerJWToken, fee_amount, fee_wallet, user_id);
+            if (!feeBalanceCheck.status) {
+                return res.status(400).json(feeBalanceCheck.error);
+            }
+
+            // Deduct the fee
+            const feeDeduction = await deductUserFee(userBearerJWToken, fee_amount, fee_wallet, user_id, stakingTransactionID);
+            if (!feeDeduction.status) {
+                return res.status(400).json(feeDeduction.error);
+            }
+
+            // Credit the fee to fee user
+            const feeCredit = await creditFeeToFeeUser(userBearerJWToken, fee_amount, fee_wallet, stakingTransactionID, user_id);
+            if (!feeCredit.status) {
+                return res.status(400).json(feeCredit.error);
+            }
+        }
+
         // Step 1: Debit the locked staking wallet
         const debitRequestBody = buildCapitalDebitRequestBody(request_id, user_id, stakingTransactionID, staking_amount, staking_locked_wallet_id, stakingMeta, true);
         // Add blockchain withdrawal address to meta_data for external withdrawals
@@ -228,7 +294,8 @@ router.post('/blockchain-external/:stakingTransactionID', async (req, res) => {
             blockchain_withdrawal_address_to,
             stakingMeta,
             debitResponse.data.data.transaction_id,
-            creditResponse.data.data.transaction_id
+            creditResponse.data.data.transaction_id,
+            'plan_4'
         );
 
         const withdrawalDebitResponse = await createDebitTransaction(userBearerJWToken, withdrawalDebitRequestBody);
