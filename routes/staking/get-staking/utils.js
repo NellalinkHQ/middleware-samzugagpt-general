@@ -10,6 +10,8 @@ const DEFAULT_SUPPORTED_STAKING_WALLETS = 'szcb,szcbii,hhc';
 const DEFAULT_EXCHANGE_RATE_TO_USDT_STAKING_INTEREST = '0.1';
 const DEFAULT_MINIMUM_STAKING_AMOUNT = '5';
 const DEFAULT_MAXIMUM_STAKING_AMOUNT = '100';
+const DEFAULT_MINIMUM_ROI_WITHDRAWAL_AMOUNT = '1';
+const DEFAULT_MAXIMUM_ROI_WITHDRAWAL_AMOUNT = '50';
 const DEFAULT_ROI_WITHDRAWAL_FEE_INTERNAL = '0';
 const DEFAULT_ROI_WITHDRAWAL_FEE_EXTERNAL = '1';
 const DEFAULT_ROI_WITHDRAWAL_FEE_WALLET = 'szcb2';
@@ -120,9 +122,17 @@ async function setStakingPlanData(staking_plan_id, planData) {
             }
         });
 
+        // Add wallet-specific ROI withdrawal amount defaults
+        const walletSpecificDefaults = {};
+        supportedWallets.forEach(wallet => {
+            walletSpecificDefaults[`minimum_roi_withdrawal_amount_${wallet}`] = DEFAULT_MINIMUM_ROI_WITHDRAWAL_AMOUNT;
+            walletSpecificDefaults[`maximum_roi_withdrawal_amount_${wallet}`] = DEFAULT_MAXIMUM_ROI_WITHDRAWAL_AMOUNT;
+        });
+
         // Merge user data with default withdrawal fees and supported wallets
         const defaultFees = {
             supported_staking_wallet: supportedWallets.join(','),
+            ...walletSpecificDefaults,
             roi_withdrawal_fee_internal: DEFAULT_ROI_WITHDRAWAL_FEE_INTERNAL,
             roi_withdrawal_fee_external: DEFAULT_ROI_WITHDRAWAL_FEE_EXTERNAL,
             roi_withdrawal_fee_wallet: DEFAULT_ROI_WITHDRAWAL_FEE_WALLET,
@@ -162,9 +172,6 @@ async function setStakingPlanData(staking_plan_id, planData) {
             message: `Staking plan data set successfully for ${staking_plan_id}`,
             data: response.data,
             meta: {
-                default_fees_included: true,
-                fees_applied: defaultFees,
-                user_data: planData
             }
         };
 
@@ -235,6 +242,12 @@ async function getStakingPlanDataFromAPI(staking_plan_id) {
             metaKeys.push(`${staking_plan_id}_maximum_staking_amount_${wallet}`);
         });
 
+        // Add minimum and maximum ROI withdrawal amount keys for each supported wallet
+        supportedWallets.forEach(wallet => {
+            metaKeys.push(`${staking_plan_id}_minimum_roi_withdrawal_amount_${wallet}`);
+            metaKeys.push(`${staking_plan_id}_maximum_roi_withdrawal_amount_${wallet}`);
+        });
+
         // Add other plan-specific keys (not wallet-specific)
         metaKeys.push(
             `${staking_plan_id}_supported_staking_wallet`,
@@ -293,22 +306,28 @@ async function getStakingPlanDataFromAPI(staking_plan_id) {
         supportedWallets.forEach(walletTicker => {
             if (walletTicker) {
                 // Exchange rate for each wallet to USDT staking interest
-                filteredDefaultData[`exchange_rate_${walletTicker}_to_usdt_staking_interest`] = parseFloat(DEFAULT_EXCHANGE_RATE_TO_USDT_STAKING_INTEREST);
+                filteredDefaultData[`exchange_rate_${walletTicker}_to_usdt_staking_interest`] = DEFAULT_EXCHANGE_RATE_TO_USDT_STAKING_INTEREST;
                 
                 // Minimum staking amount for each wallet
-                filteredDefaultData[`minimum_staking_amount_${walletTicker}`] = parseFloat(DEFAULT_MINIMUM_STAKING_AMOUNT);
+                filteredDefaultData[`minimum_staking_amount_${walletTicker}`] = DEFAULT_MINIMUM_STAKING_AMOUNT;
                 
                 // Maximum staking amount for each wallet
-                filteredDefaultData[`maximum_staking_amount_${walletTicker}`] = parseFloat(DEFAULT_MAXIMUM_STAKING_AMOUNT);
+                filteredDefaultData[`maximum_staking_amount_${walletTicker}`] = DEFAULT_MAXIMUM_STAKING_AMOUNT;
+                
+                // Minimum ROI withdrawal amount for each wallet
+                filteredDefaultData[`minimum_roi_withdrawal_amount_${walletTicker}`] = DEFAULT_MINIMUM_ROI_WITHDRAWAL_AMOUNT;
+                
+                // Maximum ROI withdrawal amount for each wallet
+                filteredDefaultData[`maximum_roi_withdrawal_amount_${walletTicker}`] = DEFAULT_MAXIMUM_ROI_WITHDRAWAL_AMOUNT;
             }
         });
 
         // Add withdrawal fees at the end
-        filteredDefaultData.roi_withdrawal_fee_internal = parseFloat(DEFAULT_ROI_WITHDRAWAL_FEE_INTERNAL);
-        filteredDefaultData.roi_withdrawal_fee_external = parseFloat(DEFAULT_ROI_WITHDRAWAL_FEE_EXTERNAL);
+        filteredDefaultData.roi_withdrawal_fee_internal = DEFAULT_ROI_WITHDRAWAL_FEE_INTERNAL;
+        filteredDefaultData.roi_withdrawal_fee_external = DEFAULT_ROI_WITHDRAWAL_FEE_EXTERNAL;
         filteredDefaultData.roi_withdrawal_fee_wallet = DEFAULT_ROI_WITHDRAWAL_FEE_WALLET;
-        filteredDefaultData.capital_withdrawal_fee_internal = parseFloat(DEFAULT_CAPITAL_WITHDRAWAL_FEE_INTERNAL);
-        filteredDefaultData.capital_withdrawal_fee_external = parseFloat(DEFAULT_CAPITAL_WITHDRAWAL_FEE_EXTERNAL);
+        filteredDefaultData.capital_withdrawal_fee_internal = DEFAULT_CAPITAL_WITHDRAWAL_FEE_INTERNAL;
+        filteredDefaultData.capital_withdrawal_fee_external = DEFAULT_CAPITAL_WITHDRAWAL_FEE_EXTERNAL;
         filteredDefaultData.capital_withdrawal_fee_wallet = DEFAULT_CAPITAL_WITHDRAWAL_FEE_WALLET;
 
         // Merge with default values for missing keys
@@ -376,22 +395,28 @@ function getStakingPlanData(staking_plan_id) {
         supportedWallets.forEach(walletTicker => {
             if (walletTicker) {
                 // Exchange rate for each wallet to USDT staking interest
-                planData[`exchange_rate_${walletTicker}_to_usdt_staking_interest`] = parseFloat(DEFAULT_EXCHANGE_RATE_TO_USDT_STAKING_INTEREST);
+                planData[`exchange_rate_${walletTicker}_to_usdt_staking_interest`] = DEFAULT_EXCHANGE_RATE_TO_USDT_STAKING_INTEREST;
                 
                 // Minimum staking amount for each wallet
-                planData[`minimum_staking_amount_${walletTicker}`] = parseFloat(DEFAULT_MINIMUM_STAKING_AMOUNT);
+                planData[`minimum_staking_amount_${walletTicker}`] = DEFAULT_MINIMUM_STAKING_AMOUNT;
                 
                 // Maximum staking amount for each wallet
-                planData[`maximum_staking_amount_${walletTicker}`] = parseFloat(DEFAULT_MAXIMUM_STAKING_AMOUNT);
+                planData[`maximum_staking_amount_${walletTicker}`] = DEFAULT_MAXIMUM_STAKING_AMOUNT;
+                
+                // Minimum ROI withdrawal amount for each wallet
+                planData[`minimum_roi_withdrawal_amount_${walletTicker}`] = DEFAULT_MINIMUM_ROI_WITHDRAWAL_AMOUNT;
+                
+                // Maximum ROI withdrawal amount for each wallet
+                planData[`maximum_roi_withdrawal_amount_${walletTicker}`] = DEFAULT_MAXIMUM_ROI_WITHDRAWAL_AMOUNT;
             }
         });
 
         // Add withdrawal fees at the end
-        planData.roi_withdrawal_fee_internal = parseFloat(DEFAULT_ROI_WITHDRAWAL_FEE_INTERNAL);
-        planData.roi_withdrawal_fee_external = parseFloat(DEFAULT_ROI_WITHDRAWAL_FEE_EXTERNAL);
+        planData.roi_withdrawal_fee_internal = DEFAULT_ROI_WITHDRAWAL_FEE_INTERNAL;
+        planData.roi_withdrawal_fee_external = DEFAULT_ROI_WITHDRAWAL_FEE_EXTERNAL;
         planData.roi_withdrawal_fee_wallet = DEFAULT_ROI_WITHDRAWAL_FEE_WALLET;
-        planData.capital_withdrawal_fee_internal = parseFloat(DEFAULT_CAPITAL_WITHDRAWAL_FEE_INTERNAL);
-        planData.capital_withdrawal_fee_external = parseFloat(DEFAULT_CAPITAL_WITHDRAWAL_FEE_EXTERNAL);
+        planData.capital_withdrawal_fee_internal = DEFAULT_CAPITAL_WITHDRAWAL_FEE_INTERNAL;
+        planData.capital_withdrawal_fee_external = DEFAULT_CAPITAL_WITHDRAWAL_FEE_EXTERNAL;
         planData.capital_withdrawal_fee_wallet = DEFAULT_CAPITAL_WITHDRAWAL_FEE_WALLET;
 
         return {
@@ -449,9 +474,9 @@ function getWalletStakingLimits(walletTicker) {
         message: `Staking limits retrieved for ${walletTicker}`,
         data: {
             wallet_ticker: walletTicker,
-            minimum_staking_amount: parseFloat(DEFAULT_MINIMUM_STAKING_AMOUNT),
-            maximum_staking_amount: parseFloat(DEFAULT_MAXIMUM_STAKING_AMOUNT),
-            exchange_rate_to_usdt_staking_interest: parseFloat(DEFAULT_EXCHANGE_RATE_TO_USDT_STAKING_INTEREST)
+            minimum_staking_amount: DEFAULT_MINIMUM_STAKING_AMOUNT,
+            maximum_staking_amount: DEFAULT_MAXIMUM_STAKING_AMOUNT,
+            exchange_rate_to_usdt_staking_interest: DEFAULT_EXCHANGE_RATE_TO_USDT_STAKING_INTEREST
         }
     };
 }
