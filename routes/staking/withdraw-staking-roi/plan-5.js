@@ -129,13 +129,6 @@ router.post('/:stakingTransactionID', async (req, res) => {
             return res.status(400).send(validationError);
         }
 
-        // Check for pending transactions
-        const transactionExists = await checkPendingTransactions(user_id, userBearerJWToken);
-        if (transactionExists === "yes") {
-            const pendingError = buildPendingTransactionError(transactionExists);
-            return res.status(400).send(pendingError);
-        }
-
         // Step 1: Debit the ROI amount from user's main wallet
         const debitRequestBody = buildRoiDebitRequestBody(request_id, user_id, amount_to_withdraw, stakingTransactionID, stakingMetaData, stakingMetrics);
         const debitResponse = await createDebitTransaction(userBearerJWToken, debitRequestBody);

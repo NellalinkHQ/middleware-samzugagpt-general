@@ -4,6 +4,14 @@ var router = express.Router();
 // Import userJWT-TokenSecurity middleware
 const userJWTSecurityCheck= require('../../middleware-utils/user-jwt-token-security-validation');
 
+// Import handlers for data endpoints
+const { handleGetSupportedPlans, handleSetStakingPlanData, handleGetStakingPlanData } = require('./get-staking/utils');
+
+/* Data API Routes - These must come BEFORE wildcard routes */
+router.get('/data/supported-plans', userJWTSecurityCheck, handleGetSupportedPlans);
+router.put('/data/plan/:staking_plan_id', userJWTSecurityCheck, handleSetStakingPlanData);
+router.get('/data/plan/:staking_plan_id', userJWTSecurityCheck, handleGetStakingPlanData);
+
 /* Create Staking */
 router.use('/', userJWTSecurityCheck, require('./create-staking'));
 
@@ -13,6 +21,7 @@ router.use('/plan-2', userJWTSecurityCheck, require('./create-staking/plan-2'));
 router.use('/plan-3', userJWTSecurityCheck, require('./create-staking/plan-3'));
 router.use('/plan-4', userJWTSecurityCheck, require('./create-staking/plan-4'));
 router.use('/plan-5', userJWTSecurityCheck, require('./create-staking/plan-5'));
+
 /* Get Staking Details*/
 router.use('/', userJWTSecurityCheck, require('./get-staking'));
 
@@ -29,6 +38,7 @@ router.use('/withdraw-roi/plan-2', userJWTSecurityCheck, require('./withdraw-sta
 router.use('/withdraw-roi/plan-3', userJWTSecurityCheck, require('./withdraw-staking-roi/plan-3'));
 router.use('/withdraw-roi/plan-4', userJWTSecurityCheck, require('./withdraw-staking-roi/plan-4'));
 router.use('/withdraw-roi/plan-5', userJWTSecurityCheck, require('./withdraw-staking-roi/plan-5'));
+
 
 /* Get Accumulated Staking ROI */
 router.use('/accumulated-roi', userJWTSecurityCheck, require('./staking-accumulated-roi'));

@@ -84,13 +84,6 @@ router.post('/:stakingTransactionID', async (req, res) => {
         // Extract required fields
         const { staking_capital_payment_wallet_id, staking_amount, user_id, staking_locked_wallet_id } = extractStakingFields(stakingMeta);
 
-        // Check for pending transactions
-        const transactionExists = await checkPendingTransactions(user_id, userBearerJWToken);
-        if (transactionExists === "yes") {
-            const pendingError = buildPendingTransactionError(transactionExists);
-            return res.status(400).send(pendingError);
-        }
-
         // Step 1: Debit the locked staking wallet
         const debitRequestBody = buildCapitalDebitRequestBody(request_id, user_id, stakingTransactionID, staking_amount, staking_locked_wallet_id, stakingMeta, false);
         const debitResponse = await createDebitTransaction(userBearerJWToken, debitRequestBody);

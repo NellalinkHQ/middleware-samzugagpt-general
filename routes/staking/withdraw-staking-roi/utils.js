@@ -508,7 +508,7 @@ function buildExternalWithdrawalDebitRequestBody($request_id, stakingTransaction
         user_id: String(user_id),
         amount: String(amount_to_withdraw),
         wallet_id: String(wallet_id),
-        note: `External Wallet ROI Withdrawal ~ ${stakingMeta.staking_plan_name}`,
+        note: `External Wallet ROI Withdrawal Request ~ ${stakingMeta.staking_plan_name}`,
         meta_data: {
             blockchain_withdrawal_address_to: String(blockchain_withdrawal_address_to),
             transaction_status: 'pending',

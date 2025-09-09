@@ -56,7 +56,7 @@ try {
 router.post('/:stakingTransactionID', async (req, res) => {
     try {
         const stakingTransactionID = req.params.stakingTransactionID;
-        const { request_id, amount_to_withdraw } = req.body;
+        const { request_id } = req.body;
 
         // Validate JWT token
         const jwtValidation = validateJWTToken(req, res);
