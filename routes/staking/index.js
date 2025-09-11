@@ -12,9 +12,6 @@ router.get('/data/supported-plans', userJWTSecurityCheck, handleGetSupportedPlan
 router.put('/data/plan/:staking_plan_id', userJWTSecurityCheck, handleSetStakingPlanData);
 router.get('/data/plan/:staking_plan_id', userJWTSecurityCheck, handleGetStakingPlanData);
 
-/* Create Staking */
-router.use('/', userJWTSecurityCheck, require('./create-staking'));
-
 /* Create Plan Staking */
 router.use('/plan-1', userJWTSecurityCheck, require('./create-staking/plan-1'));
 router.use('/plan-2', userJWTSecurityCheck, require('./create-staking/plan-2'));
@@ -45,12 +42,6 @@ router.use('/accumulated-roi', userJWTSecurityCheck, require('./staking-accumula
 
 /* Get Staking Total Interest Balance */
 router.use('/total-accumulated-roi', userJWTSecurityCheck, require('./staking-accumulated-roi-total-balance'));
-
-/* Withdraw Acuumulated Staking ROI */
-router.use('/withdraw-roi-old', userJWTSecurityCheck, require('./staking-withdraw-roi'));
-
-/* Withdraw Staking Capital */
-router.use('/withdraw-capital-old', userJWTSecurityCheck, require('./staking-withdraw-capital'));
 
 /* Index */
 router.get('/', function(req, res, next) {

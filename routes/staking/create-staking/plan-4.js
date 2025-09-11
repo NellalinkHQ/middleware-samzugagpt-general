@@ -135,7 +135,7 @@ router.post('/', async function(req, res, next) {
 
         // Add Plan 4 specific meta fields
         creditRequestBody.meta_data.stop_roi_after_capital_withdrawal = "yes";
-        creditRequestBody.meta_data.instant_capital_withdrawal = "yes";
+        creditRequestBody.meta_data.instant_capital_withdrawal = "no";
 
         // Add pattern-specific metadata if needed
         const exchange_rate_at_time_of_staking = planData.data[`exchange_rate_${wallet_id}_to_usdt_staking_interest`];

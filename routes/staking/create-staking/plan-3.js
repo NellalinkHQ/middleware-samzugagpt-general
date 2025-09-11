@@ -64,7 +64,7 @@ router.post('/', async function(req, res, next) {
         // Plan pecific parameters
         const roi_payment_percentage_of_staking_amount = MODULE1_STAKING_PLAN_3_ROI_PAYMENT_PERCENTAGE_OF_STAKING_AMOUNT_PER_INTERVAL;
         const roi_payment_interval = MODULE1_STAKING_PLAN_3_ROI_PAYMENT_INTERVAL; 
-        const roi_payment_duration = MODULE1_STAKING_PLAN_3
+        const roi_payment_duration = MODULE1_STAKING_PLAN_3_ROI_PAYMENT_DURATION
         const roi_withdrawal_interval = MODULE1_STAKING_PLAN_3_ROI_WITHDRAWAL_INTERVAL;
         const roi_payment_wallet_id = MODULE1_STAKING_PLAN_3_ROI_PAYMENT_WALLET_ID;
         const roi_first_withdrawal_duration = MODULE1_STAKING_PLAN_3_ROI_FIRST_WITHDRAWAL_DURATION;
