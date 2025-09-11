@@ -1,8 +1,39 @@
 const express = require('express');
-const axios = require('axios');
 const router = express.Router();
 
 const { handleTryCatchError } = require('../../../middleware-utils/custom-try-catch-error');
+
+// Import shared utilities
+const {
+    validateJWTToken,
+    validateBlockchainWithdrawalAddress,
+    fetchAndValidateStakingMeta,
+    validateStakingPlan,
+    validateWithdrawalRequest,
+    validateRoiWithdrawalTiming,
+    validateWithdrawalAmount,
+    checkWithdrawalExists,
+    checkInternalRoiWithdrawn,
+    checkExternalWithdrawalExists,
+    checkPendingTransactions,
+    buildRoiDebitRequestBody,
+    buildRoiCreditRequestBody,
+    buildUpdateStakingRequestBody,
+    createDebitTransaction,
+    createCreditTransaction,
+    updateStakingMeta,
+    updateUserPendingTransactionStatus,
+    buildExternalWithdrawalDebitRequestBody,
+    buildRoiWithdrawalSuccessResponse,
+    buildInternalRoiWithdrawalBlockedError,
+    buildExternalRoiWithdrawalExistsError,
+    buildPendingTransactionError,
+    buildInsufficientRoiBalanceError,
+    invalidateStakingMetaCache,
+    checkUserFeeBalance,
+    deductUserFee,
+    creditFeeToFeeUser
+} = require('./utils');
 
 // Import the new utils
 const {
@@ -16,15 +47,13 @@ const {
     formatRemainingTime
 } = require('../utils');
 
-const MODULE1_STAKING_BASE_URL = process.env.MODULE1_STAKING_BASE_URL;
-const MODULE1_STAKING_API_KEY = process.env.MODULE1_STAKING_API_KEY;
+const MODULE1_STAKING_PLAN_2_NAME = process.env.MODULE1_STAKING_PLAN_2_NAME || 'Plan 2';
 
-// Simple in-memory cache for staking meta data
-const stakingMetaCache = new Map();
-const CACHE_TTL = 30000; // 30 seconds cache
+// Import get-staking utils for dynamic fee configuration
+const { getStakingPlanDataFromAPI } = require('../get-staking/utils');
 
 /**
- * Plan 2 Staking ROI Withdrawal
+ * ${MODULE1_STAKING_PLAN_2_NAME} Staking ROI Withdrawal
  * 
  * Request Body:
  * - request_id: Unique request identifier
@@ -39,17 +68,10 @@ router.post('/:stakingTransactionID', async function(req, res, next) {
         const stakingTransactionID = req.params.stakingTransactionID;
         const { request_id, user_id, amount_to_withdraw } = req.body;   
 
-        // Validate authorization
-        if (!req.headers.authorization) {
-            return res.status(400).send({
-                status: false,
-                status_code: 400,
-                message: 'JWT Token required',
-                error: { error_data: req.headers.authorization }
-            });
-        }
-    
-        const userBearerJWToken = req.headers.authorization.split(' ')[1];
+        // Validate JWT token
+        const jwtValidation = validateJWTToken(req, res);
+        if (jwtValidation.error) return jwtValidation.error;
+        const { userBearerJWToken } = jwtValidation;
 
         // Validate request body
         const validationResult = validateWithdrawalRequest(req.body);
@@ -62,31 +84,36 @@ router.post('/:stakingTransactionID', async function(req, res, next) {
             });
         }
 
-        // Get staking meta data (with caching)
-        const stakingMetaData = await getStakingMetaData(stakingTransactionID, userBearerJWToken);
-        if (!stakingMetaData) {
-            return res.status(404).send({
-                status: false,
-                status_code: 404,
-                message: "Plan 2 staking transaction not found",
-                error: { stakingTransactionID }
-            });
+        // Fetch and validate staking meta data
+        const stakingMetaData = await fetchAndValidateStakingMeta(stakingTransactionID, userBearerJWToken);
+
+        // Validate Plan staking
+        const planValidation = validateStakingPlan(stakingMetaData, "plan_2");
+        if (planValidation.error) return res.status(400).json(planValidation.error);
+
+        // Calculate staking metrics using utils - use pattern-specific calculation
+        let stakingMetrics;
+        if (stakingMetaData.staking_roi_payment_pattern === "internal_pattern_2") {
+            // For pattern_2, calculate using pattern-specific fields
+            const staking_roi_payment_endtime_ts = parseInt(stakingMetaData.staking_roi_payment_endtime_ts_internal_pattern_2);
+            
+            // For Plan, if capital has been withdrawn, use the capital withdrawal time as the effective end time
+            const stakingPlanId = stakingMetaData.staking_plan_id;
+            const capitalWithdrawnAt = parseInt(stakingMetaData.staking_capital_withdrawn_at);
+            let effectiveEndTime = staking_roi_payment_endtime_ts;
+            
+            if (stakingPlanId === 'plan_2' && capitalWithdrawnAt && capitalWithdrawnAt > 0) {
+                // For Plan with capital withdrawn, ROI stops at capital withdrawal time
+                effectiveEndTime = Math.min(staking_roi_payment_endtime_ts, capitalWithdrawnAt);
+            }
+            
+            stakingMetrics = calculateStakingROIMetricsFromMetaDataPattern2(stakingMetaData, effectiveEndTime);
+        } else {
+            // For normal pattern, use standard calculation
+            stakingMetrics = calculateStakingROIMetricsFromMetaData(stakingMetaData);
         }
 
-        // Validate that this is a Plan 2 staking
-        if (stakingMetaData.staking_plan_id !== 'plan_2') {
-            return res.status(400).send({
-                status: false,
-                status_code: 400,
-                message: 'This endpoint is only for Plan 2 staking transactions',
-                error: {
-                    staking_plan_id: stakingMetaData.staking_plan_id,
-                    required_plan: 'plan_2'
-                }
-            });
-        }
-
-        // Check if withdrawal already exists
+        // 1. Check if transaction with request id exists, tell the user it exists if it exists
         const withdrawalExists = await checkWithdrawalExists(stakingTransactionID, request_id);
         if (withdrawalExists) {
             return res.status(400).send({
@@ -97,17 +124,16 @@ router.post('/:stakingTransactionID', async function(req, res, next) {
             });
         }
 
-        // Calculate staking metrics using utils - use pattern-specific calculation
-        let stakingMetrics;
-        if (stakingMetaData.staking_roi_payment_pattern === "internal_pattern_2") {
-            // For pattern_2, calculate using pattern-specific fields
-            const staking_roi_payment_endtime_ts = parseInt(stakingMetaData.staking_roi_payment_endtime_ts_internal_pattern_2);
-            
-            // For Plan 2, ROI continues until contract end (no early termination)
-            stakingMetrics = calculateStakingROIMetricsFromMetaDataPattern2(stakingMetaData, staking_roi_payment_endtime_ts);
-        } else {
-            // For normal pattern, use standard calculation
-            stakingMetrics = calculateStakingROIMetricsFromMetaData(stakingMetaData);
+        // 2. Check for ROI Eligible time
+        const timingValidation = validateRoiWithdrawalTiming(stakingMetaData);
+        if (timingValidation.error) {
+            return res.status(400).send(timingValidation.error);
+        }
+
+        // 3. Check if user ROI balance is enough, if not throw error
+        if (!stakingMetrics.accumulated_roi_user_can_withdraw_now || stakingMetrics.accumulated_roi_user_can_withdraw_now <= 0) {
+            const insufficientBalanceError = buildInsufficientRoiBalanceError(stakingMetrics, stakingMetaData);
+            return res.status(400).send(insufficientBalanceError);
         }
 
         // Validate withdrawal amount
@@ -116,231 +142,244 @@ router.post('/:stakingTransactionID', async function(req, res, next) {
             return res.status(400).send(validationError);
         }
 
-        // Check if ROI can be withdrawn (Plan 2 allows ROI withdrawal even after contract ends)
-        if (!stakingMetrics.accumulated_roi_user_can_withdraw_now || stakingMetrics.accumulated_roi_user_can_withdraw_now <= 0) {
-            return res.status(400).send({
-                status: false,
-                status_code: 400,
-                message: "No ROI available for withdrawal",
-                error: {
-                    available_roi: stakingMetrics.accumulated_roi_user_can_withdraw_now,
-                    total_accumulated_roi: stakingMetrics.accumulated_roi_now,
-                    already_withdrawn: stakingMetrics.accumulated_roi_user_have_already_withdraw,
-                    staking_plan_id: stakingMetaData.staking_plan_id,
-                    staking_plan_name: stakingMetaData.staking_plan_name
-                }
-            });
+        // Get dynamic fee configuration for internal ROI withdrawal
+        const planData = await getStakingPlanDataFromAPI('plan_2');
+        if (!planData.status) {
+            return res.status(400).json(planData.error);
+        }
+
+        const fee_amount = planData.data.roi_withdrawal_fee_internal;
+        const fee_wallet = planData.data.roi_withdrawal_fee_wallet;
+        
+        // Skip fee processing if fee is zero
+        if (parseFloat(fee_amount) > 0) {
+            // Check if user has sufficient balance for fee
+            const feeBalanceCheck = await checkUserFeeBalance(userBearerJWToken, fee_amount, fee_wallet, user_id);
+            if (!feeBalanceCheck.status) {
+                return res.status(400).json(feeBalanceCheck.error);
+            }
+
+            // Deduct the fee
+            const feeDeduction = await deductUserFee(userBearerJWToken, fee_amount, fee_wallet, user_id, stakingTransactionID);
+            if (!feeDeduction.status) {
+                return res.status(400).json(feeDeduction.error);
+            }
+
+            // Credit the fee to fee user 
+            const feeCredit = await creditFeeToFeeUser(userBearerJWToken, fee_amount, fee_wallet, stakingTransactionID, user_id);
+            if (!feeCredit.status) {
+                return res.status(400).json(feeCredit.error);
+            }
         }
 
         // Step 1: Debit the ROI wallet
-        const debitUrl = `${MODULE1_STAKING_BASE_URL}/wp-json/rimplenet/v1/debits`;
-        const debitRequestBody = buildRoiDebitRequestBody(request_id, user_id, amount_to_withdraw, stakingMetaData, stakingMetrics);
-        
-        const debitResponse = await axios.post(debitUrl, debitRequestBody, {
-            headers: {
-                'x-api-key': MODULE1_STAKING_API_KEY,
-                'Authorization': `Bearer ${userBearerJWToken}`
-            }
-        });
+        const debitRequestBody = buildRoiDebitRequestBody(request_id, user_id, amount_to_withdraw, stakingTransactionID, stakingMetaData, stakingMetrics);
+        const debitResponse = await createDebitTransaction(userBearerJWToken, debitRequestBody);
 
         // Step 2: Credit the user's main wallet
-        const creditUrl = `${MODULE1_STAKING_BASE_URL}/wp-json/rimplenet/v1/credits`;
-        const creditRequestBody = buildRoiCreditRequestBody(request_id, user_id, amount_to_withdraw, stakingMetaData, stakingMetrics, debitResponse.data.data.transaction_id);
-        
-        const creditResponse = await axios.post(creditUrl, creditRequestBody, {
-            headers: {
-                'x-api-key': MODULE1_STAKING_API_KEY,
-                'Authorization': `Bearer ${userBearerJWToken}`
-            }
-        });
+        const creditRequestBody = buildRoiCreditRequestBody(request_id, user_id, amount_to_withdraw, stakingTransactionID, stakingMetaData, stakingMetrics, debitResponse.data.data.transaction_id);
+        const creditResponse = await createCreditTransaction(userBearerJWToken, creditRequestBody);
 
         // Step 3: Update staking meta with withdrawal information
         const currentTime = Math.floor(Date.now() / 1000);
-        const updateMetaUrl = `${MODULE1_STAKING_BASE_URL}/wp-json/nellalink/v2/smart-meta-manager/content/${stakingTransactionID}`;
-        const updateMetaRequestBody = buildUpdateStakingRequestBody(stakingMetaData, amount_to_withdraw, currentTime, stakingMetrics);
-        
-        const updateMetaResponse = await axios.put(updateMetaUrl, updateMetaRequestBody, {
-            headers: {
-                'x-api-key': MODULE1_STAKING_API_KEY,
-                'Authorization': `Bearer ${userBearerJWToken}`
-            }
-        });
+        const updateMetaRequestBody = buildUpdateStakingRequestBody(stakingTransactionID, stakingMetaData, amount_to_withdraw, currentTime, stakingMetrics, false, creditResponse.data.data.transaction_id, request_id);
+        await updateStakingMeta(stakingTransactionID, userBearerJWToken, updateMetaRequestBody);
+
+        // Invalidate cache to ensure fresh data on next request
+        invalidateStakingMetaCache(stakingTransactionID);
 
         // Success response
-        return res.status(200).send({
-            status: true,
-            status_code: 200,
-            message: 'Plan 2 Staking ROI Withdrawal Completed Successfully',
-            data: {
-                staking_transaction_id: stakingTransactionID,
-                staking_plan_id: stakingMetaData.staking_plan_id,
-                staking_plan_name: stakingMetaData.staking_plan_name,
-                amount_withdrawn: amount_to_withdraw,
-                roi_withdrawal_time: currentTime,
-                roi_withdrawal_time_formatted: new Date(currentTime * 1000).toLocaleString(),
-                debit_transaction_id: debitResponse.data.data.transaction_id,
-                credit_transaction_id: creditResponse.data.data.transaction_id,
-                next_roi_withdrawal_time: updateMetaRequestBody.staking_roi_next_withdrawal_duration_ts,
-                next_roi_withdrawal_time_formatted: new Date(updateMetaRequestBody.staking_roi_next_withdrawal_duration_ts * 1000).toLocaleString(),
-                remaining_roi: stakingMetrics.accumulated_roi_user_can_withdraw_now - parseFloat(amount_to_withdraw),
-                total_accumulated_roi: stakingMetrics.accumulated_roi_now,
-                note: 'Plan 2 allows ROI withdrawal every week with long-term growth accumulation.',
-                processed_at: currentTime
-            }
-        });
+        const successResponse = buildRoiWithdrawalSuccessResponse(
+            stakingTransactionID,
+            stakingMetaData,
+            amount_to_withdraw,
+            currentTime,
+            debitResponse.data.data.transaction_id,
+            creditResponse.data.data.transaction_id,
+            false
+        );
+        return res.status(200).send(successResponse);
 
     } catch (error) {
-        console.error('Plan 2 ROI Withdrawal Error:', error);
+        console.error(`${MODULE1_STAKING_PLAN_2_NAME} ROI Withdrawal Error:`, error);
         return handleTryCatchError(res, error);
     }
 });
 
-// Helper Functions
+// POST /staking/withdraw-staking-roi/plan-2/blockchain-external/:stakingTransactionID
+router.post('/blockchain-external/:stakingTransactionID', async (req, res) => {
+    try {
+        const stakingTransactionID = req.params.stakingTransactionID;
+        const { request_id, user_id, amount_to_withdraw, blockchain_withdrawal_address_to } = req.body;
 
-function validateWithdrawalRequest(body) {
-    const errors = [];
-    
-    if (!body.request_id) errors.push('request_id is required');
-    if (!body.user_id) errors.push('user_id is required');
-    if (!body.amount_to_withdraw) errors.push('amount_to_withdraw is required');
-    
-    return {
-        isValid: errors.length === 0,
-        errors: errors
-    };
-}
+        // Validate JWT token
+        const jwtValidation = validateJWTToken(req, res);
+        if (jwtValidation.error) return jwtValidation.error;
+        const { userBearerJWToken } = jwtValidation;
 
-function validateWithdrawalAmount(amount_to_withdraw, stakingMetrics) {
-    const withdrawalAmount = parseFloat(amount_to_withdraw);
-    const availableBalance = stakingMetrics.accumulated_roi_user_can_withdraw_now;
-    
-    if (isNaN(withdrawalAmount) || withdrawalAmount <= 0) {
-        return {
-            status: false,
-            status_code: 400,
-            message: "Invalid withdrawal amount",
-            error: { amount_to_withdraw, available_balance: availableBalance }
-        };
-    }
-    
-    if (withdrawalAmount > availableBalance) {
-        return {
-            status: false,
-            status_code: 400,
-            message: "Insufficient ROI balance for withdrawal",
-            error: {
-                requested_amount: withdrawalAmount,
-                available_balance: availableBalance,
-                remaining_after_withdrawal: availableBalance - withdrawalAmount
+        // Validate blockchain withdrawal address
+        const addressValidation = validateBlockchainWithdrawalAddress(blockchain_withdrawal_address_to);
+        if (addressValidation.error) {
+            return res.status(400).json(addressValidation.error);
+        }
+
+        // Validate request body
+        const validationResult = validateWithdrawalRequest(req.body);
+        if (!validationResult.isValid) {
+            return res.status(400).send({
+                status: false,
+                status_code: 400,
+                message: "Invalid request data",
+                error: validationResult.errors
+            });
+        }
+
+        // Fetch and validate staking meta data
+        const stakingMetaData = await fetchAndValidateStakingMeta(stakingTransactionID, userBearerJWToken);
+
+        // Validate Plan staking
+        const plan4Validation = validateStakingPlan(stakingMetaData, "plan_2");
+        if (plan4Validation.error) return res.status(400).json(plan4Validation.error);
+
+        // Calculate staking metrics using utils - use pattern-specific calculation
+        let stakingMetrics;
+        if (stakingMetaData.staking_roi_payment_pattern === "internal_pattern_2") {
+            // For pattern_2, calculate using pattern-specific fields
+            const staking_roi_payment_endtime_ts = parseInt(stakingMetaData.staking_roi_payment_endtime_ts_internal_pattern_2);
+            
+            // For Plan, if capital has been withdrawn, use the capital withdrawal time as the effective end time
+            const stakingPlanId = stakingMetaData.staking_plan_id;
+            const capitalWithdrawnAt = parseInt(stakingMetaData.staking_capital_withdrawn_at);
+            let effectiveEndTime = staking_roi_payment_endtime_ts;
+            
+            if (stakingPlanId === 'plan_2' && capitalWithdrawnAt && capitalWithdrawnAt > 0) {
+                // For Plan with capital withdrawn, ROI stops at capital withdrawal time
+                effectiveEndTime = Math.min(staking_roi_payment_endtime_ts, capitalWithdrawnAt);
             }
-        };
-    }
-    
-    return null; // No validation error
-}
-
-function buildRoiDebitRequestBody(request_id, user_id, amount_to_withdraw, stakingMetaData, stakingMetrics) {
-    return {
-        request_id: `plan2_staking_roi_withdraw_debit_${request_id}`,
-        user_id: user_id,
-        amount: amount_to_withdraw,
-        wallet_id: stakingMetaData.staking_roi_payment_wallet_id,
-        note: `Plan 2 Staking ROI Withdrawal Debit - ${stakingMetaData.staking_plan_name}`,
-        meta_data: {
-            staking_transaction_id: stakingMetaData.id,
-            staking_plan_id: stakingMetaData.staking_plan_id,
-            staking_plan_name: stakingMetaData.staking_plan_name,
-            transaction_action_type: 'plan2_staking_roi_withdrawal_debit',
-            transaction_type_category: 'staking',
-            transaction_external_processor: 'middleware1',
-            transaction_approval_status: 'user_middleware_processed',
-            transaction_approval_method: 'middleware'
+            
+            stakingMetrics = calculateStakingROIMetricsFromMetaDataPattern2(stakingMetaData, effectiveEndTime);
+        } else {
+            // For normal pattern, use standard calculation
+            stakingMetrics = calculateStakingROIMetricsFromMetaData(stakingMetaData);
         }
-    };
-}
 
-function buildRoiCreditRequestBody(request_id, user_id, amount_to_withdraw, stakingMetaData, stakingMetrics) {
-    // For Plan 2, use pattern-specific withdrawn amount tracking
-    let withdrawnAmountSoFar;
-    if (stakingMetaData.staking_roi_payment_pattern === "internal_pattern_2") {
-        withdrawnAmountSoFar = stakingMetaData.staking_roi_amount_withdrawn_so_far_internal_pattern_2 || 0;
-    } else {
-        withdrawnAmountSoFar = stakingMetrics.accumulated_roi_user_have_already_withdraw || 0;
-    }
-    
-    return {
-        request_id: `plan2_staking_roi_withdraw_credit_${request_id}`,
-        user_id: user_id,
-        amount: amount_to_withdraw,
-        wallet_id: stakingMetaData.staking_capital_payment_wallet_id,
-        note: `Plan 2 Staking ROI Withdrawal Credit - ${stakingMetaData.staking_plan_name}`,
-        meta_data: {
-            staking_transaction_id: stakingMetaData.id,
-            staking_plan_id: stakingMetaData.staking_plan_id,
-            staking_plan_name: stakingMetaData.staking_plan_name,
-            staking_roi_amount_withdrawn_so_far: parseFloat(withdrawnAmountSoFar) + parseFloat(amount_to_withdraw),
-            transaction_action_type: 'plan2_staking_roi_withdrawal_credit',
-            transaction_type_category: 'staking',
-            transaction_external_processor: 'middleware1',
-            transaction_approval_status: 'user_middleware_processed',
-            transaction_approval_method: 'middleware'
+        // 1. Check if transaction with request id exists, tell the user it exists if it exists
+        const withdrawalExists = await checkWithdrawalExists(stakingTransactionID, request_id);
+        if (withdrawalExists) {
+            return res.status(400).send({
+                status: false,
+                status_code: 400,
+                message: `ROI withdrawal already processed for this request`,
+                error: { request_id, existing_transaction: withdrawalExists }
+            });
         }
-    };
-}
 
-function buildUpdateStakingRequestBody(stakingMetaData, amount_to_withdraw, currentTime, stakingMetrics) {
-    const intervalTs = TIMESTAMP_INTERVAL_VALUES[stakingMetaData.staking_roi_withdrawal_interval].ts;
-    const nextWithdrawalTime = currentTime + intervalTs;
-    
-    const requestBody = {
-        staking_roi_next_withdrawal_duration_ts: nextWithdrawalTime,
-        staking_roi_last_withdrawal_ts: currentTime
-    };
-    
-    // Update pattern-specific fields
-    if (stakingMetaData.staking_roi_payment_pattern === "internal_pattern_2") {
-        const currentWithdrawn = parseFloat(stakingMetaData.staking_roi_amount_withdrawn_so_far_internal_pattern_2 || 0);
-        requestBody.staking_roi_amount_withdrawn_so_far_internal_pattern_2 = currentWithdrawn + parseFloat(amount_to_withdraw);
-        requestBody.staking_roi_last_withdrawal_ts_internal_pattern_2 = currentTime;
-    } else {
-        const currentWithdrawn = parseFloat(stakingMetaData.staking_roi_amount_withdrawn_so_far || 0);
-        requestBody.staking_roi_amount_withdrawn_so_far = currentWithdrawn + parseFloat(amount_to_withdraw);
-    }
-    
-    return requestBody;
-}
-
-async function getStakingMetaData(stakingTransactionID, userBearerJWToken) {
-    // Check cache first
-    const cached = stakingMetaCache.get(stakingTransactionID);
-    if (cached && (Date.now() - cached.timestamp) < CACHE_TTL) {
-        return cached.data;
-    }
-    
-    // Fetch from API
-    const stakingMetaUrl = `${MODULE1_STAKING_BASE_URL}/wp-json/nellalink/v2/smart-meta-manager/content/${stakingTransactionID}`;
-    const response = await axios.get(stakingMetaUrl, {
-        headers: {
-            'x-api-key': MODULE1_STAKING_API_KEY,
-            'Authorization': `Bearer ${userBearerJWToken}`
+        // 2. Check for ROI Eligible time
+        const timingValidation = validateRoiWithdrawalTiming(stakingMetaData);
+        if (timingValidation.error) {
+            return res.status(400).send(timingValidation.error);
         }
-    });
-    
-    const data = response.data.data;
-    
-    // Cache the result
-    stakingMetaCache.set(stakingTransactionID, {
-        data: data,
-        timestamp: Date.now()
-    });
-    
-    return data;
-}
 
-async function checkWithdrawalExists(stakingTransactionID, request_id) {
-    // This is a simplified check - in production, you might want to check against a database
-    // For now, we'll assume no duplicate withdrawals for the same request_id
-    return false;
-}
+        // 3. Check if user ROI balance is enough, if not throw error
+        if (!stakingMetrics.accumulated_roi_user_can_withdraw_now || stakingMetrics.accumulated_roi_user_can_withdraw_now <= 0) {
+            const insufficientBalanceError = buildInsufficientRoiBalanceError(stakingMetrics, stakingMetaData);
+            return res.status(400).send(insufficientBalanceError);
+        }
 
-module.exports = router; 
+        // Validate withdrawal amount
+        const validationError = validateWithdrawalAmount(amount_to_withdraw, stakingMetrics);
+        if (validationError) {
+            return res.status(400).send(validationError);
+        }
+
+        // Get dynamic fee configuration for external ROI withdrawal
+        const planData = await getStakingPlanDataFromAPI('plan_2');
+        if (!planData.status) {
+            return res.status(400).json(planData.error);
+        }
+
+        const fee_amount = planData.data.roi_withdrawal_fee_external;
+        const fee_wallet = planData.data.roi_withdrawal_fee_wallet;
+        
+        // Skip fee processing if fee is zero
+        if (parseFloat(fee_amount) > 0) {
+            // Check if user has sufficient balance for fee
+            const feeBalanceCheck = await checkUserFeeBalance(userBearerJWToken, fee_amount, fee_wallet, user_id);
+            if (!feeBalanceCheck.status) {
+                return res.status(400).json(feeBalanceCheck.error);
+            }
+
+            // Deduct the fee
+            const feeDeduction = await deductUserFee(userBearerJWToken, fee_amount, fee_wallet, user_id, stakingTransactionID);
+            if (!feeDeduction.status) {
+                return res.status(400).json(feeDeduction.error);
+            }
+
+            // Credit the fee to fee user
+            const feeCredit = await creditFeeToFeeUser(userBearerJWToken, fee_amount, fee_wallet, stakingTransactionID, user_id);
+            if (!feeCredit.status) {
+                return res.status(400).json(feeCredit.error);
+            }
+        }
+        
+        // Perform transaction existence check
+        const transactionExists = await checkPendingTransactions(user_id, userBearerJWToken);
+        if (transactionExists === "yes") {
+            const pendingError = buildPendingTransactionError(transactionExists);
+            return res.status(400).send(pendingError);
+        }
+
+        // Step 1: Credit the ROI wallet
+        const creditRequestBody = buildRoiCreditRequestBody(request_id, user_id, amount_to_withdraw, stakingTransactionID, stakingMetaData, stakingMetrics);
+        const creditResponse = await createCreditTransaction(userBearerJWToken, creditRequestBody);
+
+        // Step 2: Update staking meta with withdrawal information (after credit)
+        const currentTime = Math.floor(Date.now() / 1000);
+        const updateMetaRequestBody = buildUpdateStakingRequestBody(stakingTransactionID, stakingMetaData, amount_to_withdraw, currentTime, stakingMetrics, true, creditResponse.data.data.transaction_id, request_id);
+        
+        await updateStakingMeta(stakingTransactionID, userBearerJWToken, updateMetaRequestBody);
+
+        // Step 3: Submit withdrawal request to external wallet (debit transaction)
+        const withdrawalDebitRequestBody = buildExternalWithdrawalDebitRequestBody(
+            request_id,
+            stakingTransactionID,
+            user_id,
+            amount_to_withdraw,
+            stakingMetaData.staking_roi_payment_wallet_id_internal_pattern_2,
+            blockchain_withdrawal_address_to,
+            stakingMetaData,
+            null, // debitTransactionId not needed for external withdrawal
+            creditResponse.data.data.transaction_id,
+            stakingMetaData.staking_plan_id
+        );
+
+        const withdrawalDebitResponse = await createDebitTransaction(userBearerJWToken, withdrawalDebitRequestBody);
+
+        // Step 4: Update user's pending transaction existence status
+        await updateUserPendingTransactionStatus(user_id, userBearerJWToken, "yes");
+
+        // Invalidate cache to ensure fresh data on next request
+        invalidateStakingMetaCache(stakingTransactionID);
+
+        // Success response
+        const successResponse = buildRoiWithdrawalSuccessResponse(
+            stakingTransactionID,
+            stakingMetaData,
+            amount_to_withdraw,
+            currentTime,
+            null, // debitTransactionId not applicable for external withdrawal
+            creditResponse.data.data.transaction_id,
+            true, // isExternal
+            blockchain_withdrawal_address_to,
+            withdrawalDebitResponse.data.data.transaction_id
+        );
+        return res.status(200).send(successResponse);
+
+    } catch (error) {
+        console.error(`${MODULE1_STAKING_PLAN_2_NAME} ROI External Withdrawal Error:`, error);
+        return handleTryCatchError(res, error);
+    }
+});
+
+
+module.exports = router;

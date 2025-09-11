@@ -88,8 +88,8 @@ router.post('/:stakingTransactionID', async function(req, res, next) {
         const stakingMetaData = await fetchAndValidateStakingMeta(stakingTransactionID, userBearerJWToken);
 
         // Validate Plan 4 staking
-        const plan4Validation = validateStakingPlan(stakingMetaData, "plan_4");
-        if (plan4Validation.error) return res.status(400).json(plan4Validation.error);
+        const planValidation = validateStakingPlan(stakingMetaData, "plan_4");
+        if (planValidation.error) return res.status(400).json(planValidation.error);
 
         // Calculate staking metrics using utils - use pattern-specific calculation
         let stakingMetrics;
@@ -237,7 +237,7 @@ router.post('/blockchain-external/:stakingTransactionID', async (req, res) => {
         // Fetch and validate staking meta data
         const stakingMetaData = await fetchAndValidateStakingMeta(stakingTransactionID, userBearerJWToken);
 
-        // Validate Plan 4 staking
+        // Validate Plan staking
         const plan4Validation = validateStakingPlan(stakingMetaData, "plan_4");
         if (plan4Validation.error) return res.status(400).json(plan4Validation.error);
 
@@ -247,13 +247,13 @@ router.post('/blockchain-external/:stakingTransactionID', async (req, res) => {
             // For pattern_2, calculate using pattern-specific fields
             const staking_roi_payment_endtime_ts = parseInt(stakingMetaData.staking_roi_payment_endtime_ts_internal_pattern_2);
             
-            // For Plan 4, if capital has been withdrawn, use the capital withdrawal time as the effective end time
+            // For Plan, if capital has been withdrawn, use the capital withdrawal time as the effective end time
             const stakingPlanId = stakingMetaData.staking_plan_id;
             const capitalWithdrawnAt = parseInt(stakingMetaData.staking_capital_withdrawn_at);
             let effectiveEndTime = staking_roi_payment_endtime_ts;
             
             if (stakingPlanId === 'plan_4' && capitalWithdrawnAt && capitalWithdrawnAt > 0) {
-                // For Plan 4 with capital withdrawn, ROI stops at capital withdrawal time
+                // For Plan with capital withdrawn, ROI stops at capital withdrawal time
                 effectiveEndTime = Math.min(staking_roi_payment_endtime_ts, capitalWithdrawnAt);
             }
             

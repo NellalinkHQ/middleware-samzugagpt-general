@@ -1,6 +1,7 @@
 var express = require('express');
 const axios = require('axios');
 var router = express.Router();
+const { formatAmountToDecimals } = require('./utils');
 
 const MODULE1_STAKING_BASE_URL = process.env.MODULE1_STAKING_BASE_URL;
 const MODULE1_STAKING_API_KEY = process.env.MODULE1_STAKING_API_KEY;
@@ -74,12 +75,12 @@ router.get('/:stakingTransactionID', async function(req, res, next) {
         message: "Staking ROI Interest Accumulated Retrieved",
         data: {
             checks: count_number_of_staking_payment_interval_from_startime_till_now,
-            accumulated_roi_user_can_withdraw_now: accumulated_roi_user_can_withdraw_now,
-            accumulated_roi_user_have_already_withdraw: accumulated_roi_user_have_already_withdraw,
-            accumulated_roi_now: accumulatedROINow,
-            accumulated_total_amount_now: accumulatedTotalAmountNow,
-            accumulated_total_roi_at_end_of_staking_contract: accumulated_total_roi_at_end_of_staking_contract,
-            accumulated_total_amount_at_end_of_staking_contract: accumulated_total_amount_at_end_of_staking_contract,
+            accumulated_roi_user_can_withdraw_now: formatAmountToDecimals(accumulated_roi_user_can_withdraw_now),
+            accumulated_roi_user_have_already_withdraw: formatAmountToDecimals(accumulated_roi_user_have_already_withdraw),
+            accumulated_roi_now: formatAmountToDecimals(accumulatedROINow),
+            accumulated_total_amount_now: formatAmountToDecimals(accumulatedTotalAmountNow),
+            accumulated_total_roi_at_end_of_staking_contract: formatAmountToDecimals(accumulated_total_roi_at_end_of_staking_contract),
+            accumulated_total_amount_at_end_of_staking_contract: formatAmountToDecimals(accumulated_total_amount_at_end_of_staking_contract),
             accumulated_timestamp_retrieved_at: staking_roi_accumulate_datetime_now_ts,
             accumulated_datetime_retrieved_at: formattedDateTime
         }

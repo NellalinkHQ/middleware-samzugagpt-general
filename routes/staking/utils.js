@@ -55,8 +55,9 @@ function getStakingMetrics(stakingData, providedDatetime = null) {
     // Get interval timestamp value
     const intervalTs = TIMESTAMP_INTERVAL_VALUES[staking_roi_payment_interval].ts;
     
-    // PLAN 3 & 4 LOGIC: If capital has been withdrawn, ROI stops accumulating
-    if ((staking_plan_id === 'plan_3' || staking_plan_id === 'plan_4') && staking_capital_withdrawn_at && parseInt(staking_capital_withdrawn_at) > 0) {
+    // Check if ROI should stop after capital withdrawal (based on meta field)
+    const stop_roi_after_capital_withdrawal = stakingData.stop_roi_after_capital_withdrawal;
+    if (stop_roi_after_capital_withdrawal && stop_roi_after_capital_withdrawal.toString().toLowerCase() === 'yes' && staking_capital_withdrawn_at && parseInt(staking_capital_withdrawn_at) > 0) {
         const capitalWithdrawnAt = parseInt(staking_capital_withdrawn_at);
         const effectiveEndTime = Math.min(staking_roi_payment_endtime_ts, capitalWithdrawnAt);
         
@@ -106,13 +107,13 @@ function getStakingMetrics(stakingData, providedDatetime = null) {
             count_number_of_staking_payment_interval_from_startime_till_now,
             count_number_of_staking_payment_interval_from_startime_till_provided_datetime,
             count_number_of_staking_payment_interval_from_startime_till_endtime,
-            accumulated_roi_user_can_withdraw_now: accumulated_roi_user_can_withdraw_now,
-            accumulated_roi_user_have_already_withdraw: accumulated_roi_user_have_already_withdraw,
-            roi_remaining_for_user_to_withdraw_before_staking_endtime,
-            accumulated_roi_now: accumulated_roi_now,
-            accumulated_total_amount_now: accumulated_total_amount_now,
-            accumulated_total_roi_at_end_of_staking_contract: staking_roi_full_payment_amount_at_end_of_contract,
-            accumulated_total_amount_at_end_of_staking_contract: accumulated_total_amount_at_end_of_staking_contract,
+            accumulated_roi_user_can_withdraw_now: formatAmountToDecimals(accumulated_roi_user_can_withdraw_now),
+            accumulated_roi_user_have_already_withdraw: formatAmountToDecimals(accumulated_roi_user_have_already_withdraw),
+            roi_remaining_for_user_to_withdraw_before_staking_endtime: formatAmountToDecimals(roi_remaining_for_user_to_withdraw_before_staking_endtime),
+            accumulated_roi_now: formatAmountToDecimals(accumulated_roi_now),
+            accumulated_total_amount_now: formatAmountToDecimals(accumulated_total_amount_now),
+            accumulated_total_roi_at_end_of_staking_contract: formatAmountToDecimals(staking_roi_full_payment_amount_at_end_of_contract),
+            accumulated_total_amount_at_end_of_staking_contract: formatAmountToDecimals(accumulated_total_amount_at_end_of_staking_contract),
             accumulated_timestamp_retrieved_at: currentTimestamp,
             accumulated_datetime_retrieved_at
         };
@@ -163,13 +164,13 @@ function getStakingMetrics(stakingData, providedDatetime = null) {
             count_number_of_staking_payment_interval_from_startime_till_now,
             count_number_of_staking_payment_interval_from_startime_till_provided_datetime,
             count_number_of_staking_payment_interval_from_startime_till_endtime,
-            accumulated_roi_user_can_withdraw_now: accumulated_roi_user_can_withdraw_now,
-            accumulated_roi_user_have_already_withdraw: accumulated_roi_user_have_already_withdraw,
-            roi_remaining_for_user_to_withdraw_before_staking_endtime,
-            accumulated_roi_now: accumulated_roi_now,
-            accumulated_total_amount_now: accumulated_total_amount_now,
-            accumulated_total_roi_at_end_of_staking_contract: staking_roi_full_payment_amount_at_end_of_contract,
-            accumulated_total_amount_at_end_of_staking_contract: accumulated_total_amount_at_end_of_staking_contract,
+            accumulated_roi_user_can_withdraw_now: formatAmountToDecimals(accumulated_roi_user_can_withdraw_now),
+            accumulated_roi_user_have_already_withdraw: formatAmountToDecimals(accumulated_roi_user_have_already_withdraw),
+            roi_remaining_for_user_to_withdraw_before_staking_endtime: formatAmountToDecimals(roi_remaining_for_user_to_withdraw_before_staking_endtime),
+            accumulated_roi_now: formatAmountToDecimals(accumulated_roi_now),
+            accumulated_total_amount_now: formatAmountToDecimals(accumulated_total_amount_now),
+            accumulated_total_roi_at_end_of_staking_contract: formatAmountToDecimals(staking_roi_full_payment_amount_at_end_of_contract),
+            accumulated_total_amount_at_end_of_staking_contract: formatAmountToDecimals(accumulated_total_amount_at_end_of_staking_contract),
             accumulated_timestamp_retrieved_at: currentTimestamp,
             accumulated_datetime_retrieved_at
         };
@@ -200,8 +201,9 @@ function getStakingROIMetrics(stakingData) {
     // Get interval timestamp value
     const intervalTs = TIMESTAMP_INTERVAL_VALUES[staking_roi_payment_interval].ts;
     
-    // PLAN 3 & 4 LOGIC: If capital has been withdrawn, ROI stops accumulating but can still be withdrawn
-    if ((staking_plan_id === 'plan_3' || staking_plan_id === 'plan_4') && staking_capital_withdrawn_at && parseInt(staking_capital_withdrawn_at) > 0) {
+    // Check if ROI should stop after capital withdrawal (based on meta field)
+    const stop_roi_after_capital_withdrawal = stakingData.stop_roi_after_capital_withdrawal;
+    if (stop_roi_after_capital_withdrawal && stop_roi_after_capital_withdrawal.toString().toLowerCase() === 'yes' && staking_capital_withdrawn_at && parseInt(staking_capital_withdrawn_at) > 0) {
         const capitalWithdrawnAt = parseInt(staking_capital_withdrawn_at);
         const effectiveEndTime = Math.min(staking_roi_payment_endtime_ts, capitalWithdrawnAt);
         
@@ -234,14 +236,14 @@ function getStakingROIMetrics(stakingData) {
         const validation_total = staking_roi_full_payment_amount_at_end_of_contract;
         
         return {
-            accumulated_roi_user_can_withdraw_now,
-            accumulated_roi_user_have_already_withdraw,
-            roi_remaining_for_user_to_withdraw_before_staking_endtime,
-            accumulated_roi_for_withdrawal: accumulated_roi_user_can_withdraw_now + accumulated_roi_user_have_already_withdraw,
+            accumulated_roi_user_can_withdraw_now: formatAmountToDecimals(accumulated_roi_user_can_withdraw_now),
+            accumulated_roi_user_have_already_withdraw: formatAmountToDecimals(accumulated_roi_user_have_already_withdraw),
+            roi_remaining_for_user_to_withdraw_before_staking_endtime: formatAmountToDecimals(roi_remaining_for_user_to_withdraw_before_staking_endtime),
+            accumulated_roi_for_withdrawal: formatAmountToDecimals(accumulated_roi_user_can_withdraw_now + accumulated_roi_user_have_already_withdraw),
             count_number_of_staking_payment_interval_from_startime_till_now_for_withdrawal: Math.floor((withdrawalEffectiveNow - staking_roi_payment_startime_ts) / intervalTs),
             validation: {
-                sum: validation_sum,
-                total: validation_total,
+                sum: formatAmountToDecimals(validation_sum),
+                total: formatAmountToDecimals(validation_total),
                 is_valid: Math.abs(validation_sum - validation_total) < 0.000001 // Allow for floating point precision
             }
         };
@@ -276,14 +278,14 @@ function getStakingROIMetrics(stakingData) {
         const validation_total = staking_roi_full_payment_amount_at_end_of_contract;
         
         return {
-            accumulated_roi_user_can_withdraw_now,
-            accumulated_roi_user_have_already_withdraw,
-            roi_remaining_for_user_to_withdraw_before_staking_endtime,
-            accumulated_roi_for_withdrawal: accumulated_roi_user_can_withdraw_now + accumulated_roi_user_have_already_withdraw,
+            accumulated_roi_user_can_withdraw_now: formatAmountToDecimals(accumulated_roi_user_can_withdraw_now),
+            accumulated_roi_user_have_already_withdraw: formatAmountToDecimals(accumulated_roi_user_have_already_withdraw),
+            roi_remaining_for_user_to_withdraw_before_staking_endtime: formatAmountToDecimals(roi_remaining_for_user_to_withdraw_before_staking_endtime),
+            accumulated_roi_for_withdrawal: formatAmountToDecimals(accumulated_roi_user_can_withdraw_now + accumulated_roi_user_have_already_withdraw),
             count_number_of_staking_payment_interval_from_startime_till_now_for_withdrawal: Math.floor((withdrawalEffectiveNow - staking_roi_payment_startime_ts) / intervalTs),
             validation: {
-                sum: validation_sum,
-                total: validation_total,
+                sum: formatAmountToDecimals(validation_sum),
+                total: formatAmountToDecimals(validation_total),
                 is_valid: Math.abs(validation_sum - validation_total) < 0.000001 // Allow for floating point precision
             }
         };
@@ -306,8 +308,9 @@ function getStakingCapitalMetrics(stakingData) {
     // Current timestamp
     const currentTimestamp = Math.floor(Date.now() / 1000);
     
-    // PLAN 3 & 4 LOGIC: Instant capital withdrawal (no lock period)
-    if (staking_plan_id === 'plan_3' || staking_plan_id === 'plan_4') {
+    // Check if capital can be withdrawn instantly (based on meta field)
+    const instant_capital_withdrawal = stakingData.instant_capital_withdrawal;
+    if (instant_capital_withdrawal && instant_capital_withdrawal.toString().toLowerCase() === 'yes') {
         let can_withdraw_capital = true;
         
         // If capital has already been withdrawn, cannot withdraw again
@@ -317,7 +320,7 @@ function getStakingCapitalMetrics(stakingData) {
         
         return {
             can_withdraw_capital,
-            staking_amount,
+            staking_amount: formatAmountToDecimals(staking_amount),
             current_timestamp: currentTimestamp,
             capital_locked_duration_ts: 0
         };
@@ -335,7 +338,7 @@ function getStakingCapitalMetrics(stakingData) {
         
         return {
             can_withdraw_capital,
-            staking_amount,
+            staking_amount: formatAmountToDecimals(staking_amount),
             current_timestamp: currentTimestamp,
             capital_locked_duration_ts: staking_capital_locked_duration_ts
         };
@@ -359,7 +362,9 @@ function calculateStakingMetricsFromMetaData(stakingMetaData, providedDatetime =
         staking_roi_full_payment_amount_at_end_of_contract: parseFloat(stakingMetaData.staking_roi_full_payment_amount_at_end_of_contract),
         staking_roi_amount_withdrawn_so_far: parseFloat(stakingMetaData.staking_roi_amount_withdrawn_so_far || 0),
         staking_plan_id: stakingMetaData.staking_plan_id,
-        staking_capital_withdrawn_at: stakingMetaData.staking_capital_withdrawn_at
+        staking_capital_withdrawn_at: stakingMetaData.staking_capital_withdrawn_at,
+        stop_roi_after_capital_withdrawal: stakingMetaData.stop_roi_after_capital_withdrawal,
+        instant_capital_withdrawal: stakingMetaData.instant_capital_withdrawal
     };
     return getStakingMetrics(stakingData, providedDatetime);
 }
@@ -380,7 +385,9 @@ function calculateStakingROIMetricsFromMetaData(stakingMetaData) {
         staking_roi_full_payment_amount_at_end_of_contract: parseFloat(stakingMetaData.staking_roi_full_payment_amount_at_end_of_contract),
         staking_roi_amount_withdrawn_so_far: parseFloat(stakingMetaData.staking_roi_amount_withdrawn_so_far || 0),
         staking_plan_id: stakingMetaData.staking_plan_id,
-        staking_capital_withdrawn_at: stakingMetaData.staking_capital_withdrawn_at
+        staking_capital_withdrawn_at: stakingMetaData.staking_capital_withdrawn_at,
+        stop_roi_after_capital_withdrawal: stakingMetaData.stop_roi_after_capital_withdrawal,
+        instant_capital_withdrawal: stakingMetaData.instant_capital_withdrawal
     };
     return getStakingROIMetrics(stakingData);
 }
@@ -405,6 +412,25 @@ function calculateStakingROIMetricsFromMetaDataPattern2(stakingMetaData) {
     };
     return getStakingROIMetrics(stakingData);
 }
+
+function formatAmountToDecimals(input, decimal_places = 8) {
+    // Convert string to number if needed
+    let num = typeof input === "string" ? Number(input) : input;
+  
+    if (isNaN(num)) {
+      throw new Error("Invalid number input");
+    }
+  
+    const factor = Math.pow(10, decimal_places);
+  
+    // Round to provided decimal places
+    let rounded = Math.round(num * factor) / factor;
+  
+    // Convert to string without trailing zeros
+    return Number(rounded.toString());
+  }
+  
+  
 
 /**
  * Calculate display metrics from staking meta data for pattern_2 (for display)
@@ -438,7 +464,8 @@ function calculateStakingCapitalMetricsFromMetaData(stakingMetaData) {
         staking_amount: parseFloat(stakingMetaData.staking_amount),
         staking_capital_locked_duration_ts: parseInt(stakingMetaData.staking_capital_locked_duration_ts || 0),
         staking_capital_withdrawn: stakingMetaData.staking_capital_withdrawn,
-        staking_plan_id: stakingMetaData.staking_plan_id
+        staking_plan_id: stakingMetaData.staking_plan_id,
+        instant_capital_withdrawal: stakingMetaData.instant_capital_withdrawal
     };
     return getStakingCapitalMetrics(stakingData);
 }
@@ -487,8 +514,8 @@ function calculateAllStakingSummariesFromMetaData(stakingMetaData, providedDatet
             accumulated_total_amount_now: metrics.accumulated_total_amount_now,
             accumulated_roi_at_end_of_contract: metrics.accumulated_total_roi_at_end_of_staking_contract,
             accumulated_total_amount_at_end_of_contract: metrics.accumulated_total_amount_at_end_of_staking_contract,
-            accumulated_roi_user_can_withdraw_now: metrics.accumulated_roi_user_can_withdraw_now_initial,
-            accumulated_roi_user_have_already_withdraw: metrics.accumulated_roi_user_have_already_withdraw_initial,
+            accumulated_roi_user_can_withdraw_now: metrics.accumulated_roi_user_can_withdraw_now,
+            accumulated_roi_user_have_already_withdraw: metrics.accumulated_roi_user_have_already_withdraw,
             count_number_of_staking_payment_interval_from_startime_till_now: metrics.count_number_of_staking_payment_interval_from_startime_till_now,
             count_number_of_staking_payment_interval_from_startime_till_endtime: metrics.count_number_of_staking_payment_interval_from_startime_till_endtime,
             accumulated_timestamp_retrieved_at: metrics.accumulated_timestamp_retrieved_at,
