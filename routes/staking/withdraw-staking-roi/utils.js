@@ -213,6 +213,7 @@ function validateWithdrawalAmount(amount_to_withdraw, stakingMetrics, planData, 
             error: { amount_to_withdraw, available_balance: availableBalance }
         };
     }
+
     
     // Validate minimum withdrawal amount
     const minimum_withdrawal_amount = planData?.data?.[`minimum_roi_withdrawal_amount_${staking_wallet_id}`];
@@ -794,6 +795,7 @@ async function deductUserFee(userBearerJWToken, fee_amount, fee_wallet, user_id,
             };
         }
     } catch (error) {
+        console.log(error);
         return {
             status: false,
             error: {
