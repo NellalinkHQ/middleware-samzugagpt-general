@@ -703,6 +703,8 @@ async function deductUserFee(userBearerJWToken, fee_amount, fee_wallet, user_id,
             };
         }
     } catch (error) {
+        
+        console.log("Error deducting withdrawal fee",error);
         return {
             status: false,
             error: {
