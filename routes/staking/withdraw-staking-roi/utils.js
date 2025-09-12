@@ -40,6 +40,7 @@ const CACHE_TTL = 30000; // 30 seconds cache
 /**
  * Validate JWT token from request headers
  */
+
 function validateJWTToken(req, res) {
     if (!req.headers.authorization) {
         return {
@@ -51,7 +52,7 @@ function validateJWTToken(req, res) {
             })
         };
     }
-    return { token: req.headers.authorization.split(' ')[1] };
+    return { userBearerJWToken: req.headers.authorization.split(' ')[1] };
 }
 
 /**
