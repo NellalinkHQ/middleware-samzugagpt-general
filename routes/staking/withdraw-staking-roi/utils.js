@@ -201,7 +201,7 @@ function validateRoiWithdrawalTiming(stakingMetaData) {
 /**
  * Validate withdrawal amount
  */
-function validateWithdrawalAmount(amount_to_withdraw, stakingMetrics) {
+function validateWithdrawalAmount(amount_to_withdraw, stakingMetrics, planData, staking_wallet_id) {
     const withdrawalAmount = parseFloat(amount_to_withdraw);
     const availableBalance = stakingMetrics.accumulated_roi_user_can_withdraw_now;
     
@@ -211,6 +211,36 @@ function validateWithdrawalAmount(amount_to_withdraw, stakingMetrics) {
             status_code: 400,
             message: `Invalid withdrawal amount ~ ${amount_to_withdraw}`,
             error: { amount_to_withdraw, available_balance: availableBalance }
+        };
+    }
+    
+    // Validate minimum withdrawal amount
+    const minimum_withdrawal_amount = planData?.data?.[`minimum_roi_withdrawal_amount_${staking_wallet_id}`];
+    if (minimum_withdrawal_amount && withdrawalAmount < parseFloat(minimum_withdrawal_amount)) {
+        return {
+            status: false,
+            status_code: 400,
+            message: `Withdrawal amount is below minimum required, withdrawal amount: ${withdrawalAmount}, minimum required: ${minimum_withdrawal_amount}`,
+            error: {
+                withdrawal_amount: withdrawalAmount,
+                minimum_required: minimum_withdrawal_amount,
+                staking_wallet_id: staking_wallet_id
+            }
+        };
+    }
+    
+    // Validate maximum withdrawal amount
+    const maximum_withdrawal_amount = planData?.data?.[`maximum_roi_withdrawal_amount_${staking_wallet_id}`];
+    if (maximum_withdrawal_amount && withdrawalAmount > parseFloat(maximum_withdrawal_amount)) {
+        return {
+            status: false,
+            status_code: 400,
+            message: `Withdrawal amount exceeds maximum allowed, withdrawal amount: ${withdrawalAmount}, maximum allowed: ${maximum_withdrawal_amount}`,
+            error: {
+                withdrawal_amount: withdrawalAmount,
+                maximum_allowed: maximum_withdrawal_amount,
+                staking_wallet_id: staking_wallet_id
+            }
         };
     }
     
@@ -240,12 +270,6 @@ async function checkWithdrawalExists(stakingTransactionID, request_id) {
                 'x-api-key': MODULE1_STAKING_API_KEY
             }
         });
-
-
-        console.log('stakingMetaUrl', stakingMetaUrl);
-        console.log('response', response.data.data);
-        console.log('request_id', request_id);
-        console.log('stakingTransactionID', stakingTransactionID);
 
         const existingWithdrawal = response.data.data[`staking_roi_payment_request_${stakingTransactionID}_${request_id}`];
         return existingWithdrawal || null;

@@ -86,6 +86,7 @@ router.post('/:stakingTransactionID', async function(req, res, next) {
 
         // Fetch and validate staking meta data
         const stakingMetaData = await fetchAndValidateStakingMeta(stakingTransactionID, userBearerJWToken);
+        const staking_wallet_id = stakingMetaData.staking_capital_payment_wallet_id;
 
         // Validate Plan staking
         const planValidation = validateStakingPlan(stakingMetaData, "plan_3");
@@ -136,16 +137,16 @@ router.post('/:stakingTransactionID', async function(req, res, next) {
             return res.status(400).send(insufficientBalanceError);
         }
 
-        // Validate withdrawal amount
-        const validationError = validateWithdrawalAmount(amount_to_withdraw, stakingMetrics);
-        if (validationError) {
-            return res.status(400).send(validationError);
-        }
-
         // Get dynamic fee configuration for internal ROI withdrawal
         const planData = await getStakingPlanDataFromAPI('plan_3');
         if (!planData.status) {
             return res.status(400).json(planData.error);
+        }
+
+        // Validate withdrawal amount
+        const validationError = validateWithdrawalAmount(amount_to_withdraw, stakingMetrics, planData, staking_wallet_id);
+        if (validationError) {
+            return res.status(400).send(validationError);
         }
 
         const fee_amount = planData.data.roi_withdrawal_fee_internal;
@@ -237,6 +238,8 @@ router.post('/blockchain-external/:stakingTransactionID', async (req, res) => {
         // Fetch and validate staking meta data
         const stakingMetaData = await fetchAndValidateStakingMeta(stakingTransactionID, userBearerJWToken);
 
+        const staking_wallet_id = stakingMetaData.staking_capital_payment_wallet_id;
+
         // Validate Plan staking
         const plan4Validation = validateStakingPlan(stakingMetaData, "plan_3");
         if (plan4Validation.error) return res.status(400).json(plan4Validation.error);
@@ -286,16 +289,16 @@ router.post('/blockchain-external/:stakingTransactionID', async (req, res) => {
             return res.status(400).send(insufficientBalanceError);
         }
 
-        // Validate withdrawal amount
-        const validationError = validateWithdrawalAmount(amount_to_withdraw, stakingMetrics);
-        if (validationError) {
-            return res.status(400).send(validationError);
-        }
-
         // Get dynamic fee configuration for external ROI withdrawal
         const planData = await getStakingPlanDataFromAPI('plan_3');
         if (!planData.status) {
             return res.status(400).json(planData.error);
+        }
+
+        // Validate withdrawal amount
+        const validationError = validateWithdrawalAmount(amount_to_withdraw, stakingMetrics, planData, staking_wallet_id);
+        if (validationError) {
+            return res.status(400).send(validationError);
         }
 
         const fee_amount = planData.data.roi_withdrawal_fee_external;
