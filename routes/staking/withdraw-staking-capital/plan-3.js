@@ -95,6 +95,7 @@ router.post('/:stakingTransactionID', async (req, res) => {
 
         const fee_amount = planData.data.capital_withdrawal_fee_internal;
         const fee_wallet = planData.data.capital_withdrawal_fee_wallet;
+        let fee_transaction_id = null;
         
         // Skip fee processing if fee is zero
         if (parseFloat(fee_amount) > 0) {
@@ -105,24 +106,27 @@ router.post('/:stakingTransactionID', async (req, res) => {
             }
 
             // Deduct the fee
-            const feeDeduction = await deductUserFee(userBearerJWToken, fee_amount, fee_wallet, user_id, stakingTransactionID);
+            const feeDeduction = await deductUserFee(userBearerJWToken, fee_amount, fee_wallet, user_id, stakingTransactionID, request_id);
             if (!feeDeduction.status) {
                 return res.status(400).json(feeDeduction.error);
             }
 
+            // Capture fee transaction ID
+            fee_transaction_id = feeDeduction.data.transaction_id;
+
             // Credit the fee to fee user 
-            const feeCredit = await creditFeeToFeeUser(userBearerJWToken, fee_amount, fee_wallet, stakingTransactionID, user_id);
+            const feeCredit = await creditFeeToFeeUser(userBearerJWToken, fee_amount, fee_wallet, stakingTransactionID, user_id, request_id);
             if (!feeCredit.status) {
                 return res.status(400).json(feeCredit.error);
             }
         }
 
         // Step 1: Debit the locked staking wallet
-        const debitRequestBody = buildCapitalDebitRequestBody(request_id, user_id, stakingTransactionID, staking_amount, staking_locked_wallet_id, stakingMeta, false);
+        const debitRequestBody = buildCapitalDebitRequestBody(request_id, user_id, stakingTransactionID, staking_amount, staking_locked_wallet_id, stakingMeta, false, fee_transaction_id, fee_amount, fee_wallet);
         const debitResponse = await createDebitTransaction(userBearerJWToken, debitRequestBody);
 
         // Step 2: Credit the main wallet
-        const creditRequestBody = buildCapitalCreditRequestBody(request_id, user_id, stakingTransactionID, staking_amount, staking_capital_payment_wallet_id, stakingMeta, debitResponse.data.data.transaction_id, false);
+        const creditRequestBody = buildCapitalCreditRequestBody(request_id, user_id, stakingTransactionID, staking_amount, staking_capital_payment_wallet_id, stakingMeta, debitResponse.data.data.transaction_id, false, fee_transaction_id, fee_amount, fee_wallet);
         const creditResponse = await createCreditTransaction(userBearerJWToken, creditRequestBody);
 
         // Step 3: Update staking meta with withdrawal information
@@ -251,6 +255,7 @@ router.post('/blockchain-external/:stakingTransactionID', async (req, res) => {
 
         const fee_amount = planData.data.capital_withdrawal_fee_external;
         const fee_wallet = planData.data.capital_withdrawal_fee_wallet;
+        let fee_transaction_id = null;
         
         // Skip fee processing if fee is zero
         if (parseFloat(fee_amount) > 0) {
@@ -261,26 +266,29 @@ router.post('/blockchain-external/:stakingTransactionID', async (req, res) => {
             }
 
             // Deduct the fee
-            const feeDeduction = await deductUserFee(userBearerJWToken, fee_amount, fee_wallet, user_id, stakingTransactionID);
+            const feeDeduction = await deductUserFee(userBearerJWToken, fee_amount, fee_wallet, user_id, stakingTransactionID, request_id);
             if (!feeDeduction.status) {
                 return res.status(400).json(feeDeduction.error);
             }
 
+            // Capture fee transaction ID
+            fee_transaction_id = feeDeduction.data.transaction_id;
+
             // Credit the fee to fee user
-            const feeCredit = await creditFeeToFeeUser(userBearerJWToken, fee_amount, fee_wallet, stakingTransactionID, user_id);
+            const feeCredit = await creditFeeToFeeUser(userBearerJWToken, fee_amount, fee_wallet, stakingTransactionID, user_id, request_id);
             if (!feeCredit.status) {
                 return res.status(400).json(feeCredit.error);
             }
         }
 
         // Step 1: Debit the locked staking wallet
-        const debitRequestBody = buildCapitalDebitRequestBody(request_id, user_id, stakingTransactionID, staking_amount, staking_locked_wallet_id, stakingMeta, true);
+        const debitRequestBody = buildCapitalDebitRequestBody(request_id, user_id, stakingTransactionID, staking_amount, staking_locked_wallet_id, stakingMeta, true, fee_transaction_id, fee_amount, fee_wallet);
         // Add blockchain withdrawal address to meta_data for external withdrawals
         debitRequestBody.meta_data.blockchain_withdrawal_address_to = blockchain_withdrawal_address_to;
         const debitResponse = await createDebitTransaction(userBearerJWToken, debitRequestBody);
 
         // Step 2: Credit the main wallet
-        const creditRequestBody = buildCapitalCreditRequestBody(request_id, user_id, stakingTransactionID, staking_amount, staking_capital_payment_wallet_id, stakingMeta, debitResponse.data.data.transaction_id, true);
+        const creditRequestBody = buildCapitalCreditRequestBody(request_id, user_id, stakingTransactionID, staking_amount, staking_capital_payment_wallet_id, stakingMeta, debitResponse.data.data.transaction_id, true, fee_transaction_id, fee_amount, fee_wallet);
         // Add blockchain withdrawal address to meta_data for external withdrawals
         creditRequestBody.meta_data.blockchain_withdrawal_address_to = blockchain_withdrawal_address_to;
         const creditResponse = await createCreditTransaction(userBearerJWToken, creditRequestBody);
@@ -295,7 +303,10 @@ router.post('/blockchain-external/:stakingTransactionID', async (req, res) => {
             stakingMeta,
             debitResponse.data.data.transaction_id,
             creditResponse.data.data.transaction_id,
-            'plan_3'
+            'plan_3',
+            fee_transaction_id,
+            fee_amount,
+            fee_wallet
         );
 
         const withdrawalDebitResponse = await createDebitTransaction(userBearerJWToken, withdrawalDebitRequestBody);

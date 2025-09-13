@@ -70,6 +70,9 @@ async function approveWithdrawalTransaction(transactionID, userID, metaData) {
 
 // Function to decline a withdrawal transaction
 async function declineWithdrawalTransaction(transactionID, user_id_performing_request, metaData) {
+    
+    
+    let fee_transaction_id = 0;
     try {
         // Step: Check if User Transaction ID is admin_pending 
         const transactionStatusCheckUrl = `${MODULE1_BASE_URL}/wp-json/nellalink/v2/smart-meta-manager/content/${transactionID}/utils?action=check_if_meta_value_exists&meta_key=transaction_approval_status&meta_value=pending`;
@@ -82,6 +85,7 @@ async function declineWithdrawalTransaction(transactionID, user_id_performing_re
         });
 
         const transactionStatus = transactionDetailsResponse.data.data.transaction_status;
+        fee_transaction_id = transactionDetailsResponse.data.data.fee_transaction_id;        
         if (transactionStatus !== "pending") {
             throw new Error(`Transaction is no longer on pending status (${transactionStatus})`);
         }
@@ -147,6 +151,36 @@ async function declineWithdrawalTransaction(transactionID, user_id_performing_re
 
         }
 
+        // Step Reverse the fee transaction
+        let transactionFeeReverseDisplay;
+        if(fee_transaction_id>0){
+            try {
+                const transactionFeeReverseUrl = `${MODULE1_BASE_URL}/wp-json/rimplenet-wallet-addon/v1/reverse-transaction`;
+                const transactionFeeReverseBody = {
+                        "transaction_id": fee_transaction_id,
+                        "reversed_by": user_id_performing_request,
+                        "note": `Reversal of Fee Withdrawal Request - #${fee_transaction_id}`,
+                    };
+                const transactionFeeReverseResponse = await axios.post(transactionFeeReverseUrl, transactionFeeReverseBody, {
+                    headers: {
+                        'x-api-key': MODULE1_BASE_API_KEY,
+                     // 'Authorization': `Bearer ${userBearerJWToken}` // Append JWT Bearer token to headers
+                    }
+                });
+                transactionFeeReverseDisplay = transactionFeeReverseResponse.data;
+            }
+            catch (error) {
+                // Handle error as needed
+                console.error('Error in transactionFeeReverseResponse request:', error);
+                if (error.response && error.response.data) {
+                    transactionFeeReverseDisplay = error.response.data;
+                } else {
+                    transactionFeeReverseDisplay = error;
+                }
+
+            }
+       }
+
 
 
         return {
@@ -154,7 +188,8 @@ async function declineWithdrawalTransaction(transactionID, user_id_performing_re
             message: "Withdrawal Declined Successfully",
             updateTransactionResponse: updateTransactionResponse.data,
             updateUserPendingTransactionExistsResponse: updateUserPendingTransactionExistsResponse.data,
-            transactionReverseResponse : transactionReverseDisplay
+            transactionReverseResponse : transactionReverseDisplay,
+            transactionFeeReverseResponse : transactionFeeReverseDisplay
         };
     } catch (error) {
         throw error; // Propagate error to caller for handling

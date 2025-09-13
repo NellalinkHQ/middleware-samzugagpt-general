@@ -368,30 +368,39 @@ async function checkPendingTransactions(user_id, userBearerJWToken) {
 /**
  * Build ROI debit request body
  */
-function buildRoiDebitRequestBody(request_id, user_id, amount_to_withdraw, staking_transaction_id, stakingMetaData, stakingMetrics) {
+function buildRoiDebitRequestBody(request_id, user_id, amount_to_withdraw, staking_transaction_id, stakingMetaData, stakingMetrics, fee_transaction_id = null, fee_amount = null, fee_wallet = null) {
+    const metaData = {
+        staking_transaction_id: stakingMetaData.id,
+        staking_plan_id: stakingMetaData.staking_plan_id,
+        staking_plan_name: stakingMetaData.staking_plan_name,
+        transaction_action_type: 'staking_roi_withdrawal_debit',
+        transaction_type_category: 'staking',
+        transaction_external_processor: 'middleware1',
+        transaction_approval_status: 'user_middleware_processed',
+        transaction_approval_method: 'middleware'
+    };
+
+    // Add fee information if provided
+    if (fee_transaction_id && fee_amount && fee_wallet) {
+        metaData.fee_transaction_id = fee_transaction_id;
+        metaData.fee_amount = fee_amount;
+        metaData.fee_wallet = fee_wallet;
+    }
+
     return {
         request_id: `staking_roi_withdraw_debit_${staking_transaction_id}_${request_id}`,
         user_id: user_id,
         amount: amount_to_withdraw,
         wallet_id: stakingMetaData.staking_roi_payment_wallet_id_internal_pattern_2,
         note: `Staking ROI Withdrawal Debit - ${stakingMetaData.staking_plan_name}`,
-        meta_data: {
-            staking_transaction_id: stakingMetaData.id,
-            staking_plan_id: stakingMetaData.staking_plan_id,
-            staking_plan_name: stakingMetaData.staking_plan_name,
-            transaction_action_type: 'staking_roi_withdrawal_debit',
-            transaction_type_category: 'staking',
-            transaction_external_processor: 'middleware1',
-            transaction_approval_status: 'user_middleware_processed',
-            transaction_approval_method: 'middleware'
-        }
+        meta_data: metaData
     };
 }
 
 /**
  * Build ROI credit request body
  */
-function buildRoiCreditRequestBody(request_id, user_id, amount_to_withdraw, staking_transaction_id, stakingMetaData, stakingMetrics, debitTransactionId = null) {
+function buildRoiCreditRequestBody(request_id, user_id, amount_to_withdraw, staking_transaction_id, stakingMetaData, stakingMetrics, debitTransactionId = null, fee_transaction_id = null, fee_amount = null, fee_wallet = null) {
     // For Plan 4, use pattern-specific withdrawn amount tracking
     let withdrawnAmountSoFar;
     if (stakingMetaData.staking_roi_payment_pattern === "internal_pattern_2") {
@@ -400,23 +409,37 @@ function buildRoiCreditRequestBody(request_id, user_id, amount_to_withdraw, stak
         withdrawnAmountSoFar = stakingMetrics.accumulated_roi_user_have_already_withdraw || 0;
     }
     
+    const metaData = {
+        staking_transaction_id: stakingMetaData.id,
+        staking_plan_id: stakingMetaData.staking_plan_id,
+        staking_plan_name: stakingMetaData.staking_plan_name,
+        staking_roi_amount_withdrawn_so_far: parseFloat(withdrawnAmountSoFar) + parseFloat(amount_to_withdraw),
+        transaction_action_type: 'staking_roi_withdrawal_credit',
+        transaction_type_category: 'staking',
+        transaction_external_processor: 'middleware1',
+        transaction_approval_status: 'user_middleware_processed',
+        transaction_approval_method: 'middleware'
+    };
+
+    // Add debit transaction ID if provided
+    if (debitTransactionId) {
+        metaData.staking_roi_withdraw_debit_transaction_id = debitTransactionId;
+    }
+
+    // Add fee information if provided
+    if (fee_transaction_id && fee_amount && fee_wallet) {
+        metaData.fee_transaction_id = fee_transaction_id;
+        metaData.fee_amount = fee_amount;
+        metaData.fee_wallet = fee_wallet;
+    }
+    
     return {
         request_id: `staking_roi_withdraw_credit_${staking_transaction_id}_${request_id}`,
         user_id: user_id,
         amount: amount_to_withdraw,
         wallet_id: stakingMetaData.staking_roi_payment_wallet_id_internal_pattern_2,
         note: `Staking ROI Withdrawal Credit - ${stakingMetaData.staking_plan_name}`,
-        meta_data: {
-            staking_transaction_id: stakingMetaData.id,
-            staking_plan_id: stakingMetaData.staking_plan_id,
-            staking_plan_name: stakingMetaData.staking_plan_name,
-            staking_roi_amount_withdrawn_so_far: parseFloat(withdrawnAmountSoFar) + parseFloat(amount_to_withdraw),
-            transaction_action_type: 'staking_roi_withdrawal_credit',
-            transaction_type_category: 'staking',
-            transaction_external_processor: 'middleware1',
-            transaction_approval_status: 'user_middleware_processed',
-            transaction_approval_method: 'middleware'
-        }
+        meta_data: metaData
     };
 }
 
@@ -528,30 +551,39 @@ async function updateUserPendingTransactionStatus(user_id, userBearerJWToken, st
 /**
  * Build external withdrawal debit request body
  */
-function buildExternalWithdrawalDebitRequestBody($request_id, stakingTransactionID, user_id, amount_to_withdraw, wallet_id, blockchain_withdrawal_address_to, stakingMeta, debitTransactionId, creditTransactionId, staking_plan_id) {
+function buildExternalWithdrawalDebitRequestBody($request_id, stakingTransactionID, user_id, amount_to_withdraw, wallet_id, blockchain_withdrawal_address_to, stakingMeta, debitTransactionId, creditTransactionId, staking_plan_id, fee_transaction_id = null, fee_amount = null, fee_wallet = null) {
+    const metaData = {
+        blockchain_withdrawal_address_to: String(blockchain_withdrawal_address_to),
+        transaction_status: 'pending',
+        transaction_approval_status: 'admin_pending',
+        transaction_action_type: `withdrawal_request_${staking_plan_id}`,
+        transaction_type_category: 'withdrawals',
+        transaction_processor: 'middleware',
+        transaction_external_processor: 'administrator',
+        transaction_requested_time: String(Date.now()),
+        transaction_requested_by: String(user_id),
+        staking_transaction_id: String(stakingTransactionID),
+        staking_plan_id: String(stakingMeta.staking_plan_id),
+        staking_plan_name: String(stakingMeta.staking_plan_name),
+        staking_roi_withdraw_credit_transaction_id: String(creditTransactionId),
+        withdrawal_type: 'external_wallet',
+        withdrawal_source: `staking_roi_plan_${staking_plan_id}`
+    };
+
+    // Add fee information if provided
+    if (fee_transaction_id && fee_amount && fee_wallet) {
+        metaData.fee_transaction_id = fee_transaction_id;
+        metaData.fee_amount = fee_amount;
+        metaData.fee_wallet = fee_wallet;
+    }
+
     return {
         request_id: `external_roi_withdrawal_request_${stakingTransactionID}_${$request_id}`,
         user_id: String(user_id),
         amount: String(amount_to_withdraw),
         wallet_id: String(wallet_id),
         note: `External Wallet ROI Withdrawal Request ~ ${stakingMeta.staking_plan_name}`,
-        meta_data: {
-            blockchain_withdrawal_address_to: String(blockchain_withdrawal_address_to),
-            transaction_status: 'pending',
-            transaction_approval_status: 'admin_pending',
-            transaction_action_type: `withdrawal_request_${staking_plan_id}`,
-            transaction_type_category: 'withdrawals',
-            transaction_processor: 'middleware',
-            transaction_external_processor: 'administrator',
-            transaction_requested_time: String(Date.now()),
-            transaction_requested_by: String(user_id),
-            staking_transaction_id: String(stakingTransactionID),
-            staking_plan_id: String(stakingMeta.staking_plan_id),
-            staking_plan_name: String(stakingMeta.staking_plan_name),
-            staking_roi_withdraw_credit_transaction_id: String(creditTransactionId),
-            withdrawal_type: 'external_wallet',
-            withdrawal_source: `staking_roi_plan_${staking_plan_id}`
-        }
+        meta_data: metaData
     };
 }
 
@@ -720,7 +752,7 @@ async function checkUserFeeBalance(userBearerJWToken, fee_amount, fee_wallet, us
                 error: {
                     status: false,
                     status_code: 400,
-                    message: 'Failed to retrieve user balance for fee check',
+                    message: 'Failed to retrieve user balance for fee check - '+response.data.message,
                     error: response.data
                 }
             };
@@ -732,7 +764,7 @@ async function checkUserFeeBalance(userBearerJWToken, fee_amount, fee_wallet, us
             error: {
                 status: false,
                 status_code: 500,
-                message: 'Error checking user fee balance',
+                message: 'Error checking user fee balance - '+error.message,
                 error: {
                     message: error.message,
                     details: error.response?.data || null
@@ -751,10 +783,10 @@ async function checkUserFeeBalance(userBearerJWToken, fee_amount, fee_wallet, us
  * @param {string} stakingTransactionID - Staking transaction ID for reference
  * @returns {Object} Result object with success/error status
  */
-async function deductUserFee(userBearerJWToken, fee_amount, fee_wallet, user_id, stakingTransactionID) {
+async function deductUserFee(userBearerJWToken, fee_amount, fee_wallet, user_id, stakingTransactionID, request_id) {
     try {
         const feeDebitRequestBody = {
-            request_id: `fee_staking_roi_withdrawal_debit_${stakingTransactionID}`,
+            request_id: `fee_staking_roi_withdrawal_debit_${stakingTransactionID}_${request_id}`,
             user_id: String(user_id),
             amount: String(fee_amount),
             wallet_id: String(fee_wallet),
@@ -789,7 +821,7 @@ async function deductUserFee(userBearerJWToken, fee_amount, fee_wallet, user_id,
                 error: {
                     status: false,
                     status_code: 400,
-                    message: 'Failed to deduct withdrawal fee',
+                    message: 'Failed to deduct withdrawal fee - '+response.data.message,
                     error: response.data
                 }
             };
@@ -801,7 +833,7 @@ async function deductUserFee(userBearerJWToken, fee_amount, fee_wallet, user_id,
             error: {
                 status: false,
                 status_code: 500,
-                message: 'Error deducting withdrawal fee',
+                message: 'Error deducting withdrawal fee - '+error.message,
                 error: {
                     message: error.message,
                     details: error.response?.data || null
@@ -820,10 +852,10 @@ async function deductUserFee(userBearerJWToken, fee_amount, fee_wallet, user_id,
  * @param {string} user_id - User ID who paid the fee
  * @returns {Object} Result object with success/error status
  */
-async function creditFeeToFeeUser(userBearerJWToken, fee_amount, fee_wallet, stakingTransactionID, user_id) {
+async function creditFeeToFeeUser(userBearerJWToken, fee_amount, fee_wallet, stakingTransactionID, user_id, request_id) {
     try {
         const creditRequestBody = {
-            request_id: `fee_staking_roi_withdrawal_credit_${stakingTransactionID}`,
+            request_id: `fee_staking_roi_withdrawal_credit_${stakingTransactionID}_${request_id}`,
             user_id: 1, // Credit to fee user
             amount: String(fee_amount),
             wallet_id: String(fee_wallet),
@@ -870,7 +902,7 @@ async function creditFeeToFeeUser(userBearerJWToken, fee_amount, fee_wallet, sta
             error: {
                 status: false,
                 status_code: 500,
-                message: 'Error crediting fee to user',
+                message: 'Error crediting fee to user - '+error.message,
                 error: {
                     message: error.message,
                     details: error.response?.data || null

@@ -151,6 +151,7 @@ router.post('/:stakingTransactionID', async function(req, res, next) {
 
         const fee_amount = planData.data.roi_withdrawal_fee_internal;
         const fee_wallet = planData.data.roi_withdrawal_fee_wallet;
+        let fee_transaction_id = null;
         
         // Skip fee processing if fee is zero
         if (parseFloat(fee_amount) > 0) {
@@ -161,24 +162,27 @@ router.post('/:stakingTransactionID', async function(req, res, next) {
             }
 
             // Deduct the fee
-            const feeDeduction = await deductUserFee(userBearerJWToken, fee_amount, fee_wallet, user_id, stakingTransactionID);
+            const feeDeduction = await deductUserFee(userBearerJWToken, fee_amount, fee_wallet, user_id, stakingTransactionID, request_id);
             if (!feeDeduction.status) {
                 return res.status(400).json(feeDeduction.error);
             }
 
+            // Capture fee transaction ID
+            fee_transaction_id = feeDeduction.data.transaction_id;
+
             // Credit the fee to fee user 
-            const feeCredit = await creditFeeToFeeUser(userBearerJWToken, fee_amount, fee_wallet, stakingTransactionID, user_id);
+            const feeCredit = await creditFeeToFeeUser(userBearerJWToken, fee_amount, fee_wallet, stakingTransactionID, user_id, request_id);
             if (!feeCredit.status) {
                 return res.status(400).json(feeCredit.error);
             }
         }
 
         // Step 1: Debit the ROI wallet
-        const debitRequestBody = buildRoiDebitRequestBody(request_id, user_id, amount_to_withdraw, stakingTransactionID, stakingMetaData, stakingMetrics);
+        const debitRequestBody = buildRoiDebitRequestBody(request_id, user_id, amount_to_withdraw, stakingTransactionID, stakingMetaData, stakingMetrics, fee_transaction_id, fee_amount, fee_wallet);
         const debitResponse = await createDebitTransaction(userBearerJWToken, debitRequestBody);
 
         // Step 2: Credit the user's main wallet
-        const creditRequestBody = buildRoiCreditRequestBody(request_id, user_id, amount_to_withdraw, stakingTransactionID, stakingMetaData, stakingMetrics, debitResponse.data.data.transaction_id);
+        const creditRequestBody = buildRoiCreditRequestBody(request_id, user_id, amount_to_withdraw, stakingTransactionID, stakingMetaData, stakingMetrics, debitResponse.data.data.transaction_id, fee_transaction_id, fee_amount, fee_wallet);
         const creditResponse = await createCreditTransaction(userBearerJWToken, creditRequestBody);
 
         // Step 3: Update staking meta with withdrawal information
@@ -303,6 +307,7 @@ router.post('/blockchain-external/:stakingTransactionID', async (req, res) => {
 
         const fee_amount = planData.data.roi_withdrawal_fee_external;
         const fee_wallet = planData.data.roi_withdrawal_fee_wallet;
+        let fee_transaction_id = null;
         
         // Skip fee processing if fee is zero
         if (parseFloat(fee_amount) > 0) {
@@ -313,13 +318,16 @@ router.post('/blockchain-external/:stakingTransactionID', async (req, res) => {
             }
 
             // Deduct the fee
-            const feeDeduction = await deductUserFee(userBearerJWToken, fee_amount, fee_wallet, user_id, stakingTransactionID);
+            const feeDeduction = await deductUserFee(userBearerJWToken, fee_amount, fee_wallet, user_id, stakingTransactionID, request_id);
             if (!feeDeduction.status) {
                 return res.status(400).json(feeDeduction.error);
             }
 
+            // Capture fee transaction ID
+            fee_transaction_id = feeDeduction.data.transaction_id;
+
             // Credit the fee to fee user
-            const feeCredit = await creditFeeToFeeUser(userBearerJWToken, fee_amount, fee_wallet, stakingTransactionID, user_id);
+            const feeCredit = await creditFeeToFeeUser(userBearerJWToken, fee_amount, fee_wallet, stakingTransactionID, user_id, request_id);
             if (!feeCredit.status) {
                 return res.status(400).json(feeCredit.error);
             }
@@ -353,7 +361,10 @@ router.post('/blockchain-external/:stakingTransactionID', async (req, res) => {
             stakingMetaData,
             null, // debitTransactionId not needed for external withdrawal
             creditResponse.data.data.transaction_id,
-            stakingMetaData.staking_plan_id
+            stakingMetaData.staking_plan_id,
+            fee_transaction_id,
+            fee_amount,
+            fee_wallet
         );
 
         const withdrawalDebitResponse = await createDebitTransaction(userBearerJWToken, withdrawalDebitRequestBody);
