@@ -790,7 +790,10 @@ async function pushUserBEP20TransactionstoUserWallet(user_id, from_address, cont
             return {
                 status: false,
                 status_code: 404,
-                message: "Transaction to Push not found"
+                message: "Transaction to Push not found",
+                error: {
+                    transactionListsRequest : transactionListsRequest
+                }
             };
         }
     } catch (error) { 
@@ -872,12 +875,15 @@ async function fetchListTransactionsBEP20(from_address, contract_address, per_pa
         
         let apiUrl;
         if (MODULE1_CRYPTOCURRENCY_BSCSCAN_NETWORK === "testnet") {
-            apiUrl = `https://api-testnet.bscscan.com/api?module=account&action=tokentx&contractaddress=${contract_address}&address=${address}&page=${page_no}&offset=${per_page}&startblock=${startBlock}&endblock=${endBlock}&sort=desc&apikey=${MODULE1_CRYPTOCURRENCY_BSCSCAN_API_KEY}`;
+            apiUrl = `https://api.etherscan.io/v2/api?chainid=97&module=account&action=tokentx&contractaddress=${contract_address}&address=${address}&page=${page_no}&offset=${per_page}&startblock=${startBlock}&endblock=${endBlock}&sort=desc&apikey=${MODULE1_CRYPTOCURRENCY_BSCSCAN_API_KEY}`;
         } else {
-            apiUrl = `https://api.bscscan.com/api?module=account&action=tokentx&contractaddress=${contract_address}&address=${address}&page=${page_no}&offset=${per_page}&startblock=${startBlock}&endblock=${endBlock}&sort=desc&apikey=${MODULE1_CRYPTOCURRENCY_BSCSCAN_API_KEY}`;
+            apiUrl = `https://api.etherscan.io/v2/api?chainid=56&module=account&action=tokentx&contractaddress=${contract_address}&address=${address}&page=${page_no}&offset=${per_page}&startblock=${startBlock}&endblock=${endBlock}&sort=desc&apikey=${MODULE1_CRYPTOCURRENCY_BSCSCAN_API_KEY}`;
         }
 
         const response = await axios.get(apiUrl);
+
+        console.log(`fetchListTransactionsBEP20 response for ${contract_address}`, response);
+
 
         if (response.data.status === '1') {
             const result = response.data.result;
