@@ -421,7 +421,7 @@ function buildResponse(stakingMetaData, stakingMetrics, roiHistoryData, queryPar
             staking_roi_payment_endtime_ts: parseInt(stakingMetaData.staking_roi_payment_endtime_ts_internal_pattern_2),
             staking_roi_next_withdrawal_duration_ts: stakingMetaData.staking_roi_next_withdrawal_duration_ts,
             staking_roi_last_withdrawal_ts: stakingMetaData.staking_roi_last_withdrawal_ts_internal_pattern_2 || stakingMetaData.staking_roi_last_withdrawal_ts,
-            staking_capital_withdrawal_duration_ts: parseInt(stakingMetaData.staking_roi_payment_endtime_ts_internal_pattern_2),
+            staking_capital_withdrawal_duration_ts: parseInt(stakingMetaData.staking_capital_locked_duration_ts),
             staking_capital_withdrawn_at: stakingMetaData.staking_capital_withdrawn_at,
             staking_capital_withdraw_credit_transaction_id: stakingMetaData.staking_capital_withdraw_credit_transaction_id,
             staking_capital_withdraw_debit_transaction_id: stakingMetaData.staking_capital_withdraw_debit_transaction_id,
