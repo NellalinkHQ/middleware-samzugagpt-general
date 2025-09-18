@@ -164,9 +164,9 @@ router.delete('/evm/addresses/remove', (req, res) => {
  * GET /monitor/evm/addresses/check/:address
  * Check if an EVM address is being monitored
  */
-router.get('/evm/check/:address', (req, res) => {
+router.get('/evm/check/', (req, res) => {
   try {
-    const { address } = req.params;
+    const { address } = req.body;
     
     if (!address) {
       return res.status(400).json({
@@ -177,18 +177,33 @@ router.get('/evm/check/:address', (req, res) => {
       });
     }
 
-    const isMonitored = isEvmAddressMonitored(address);
+    // Convert address to lowercase as received
+    const normalizedAddress = address.toLowerCase();
+    const isMonitored = isEvmAddressMonitored(normalizedAddress);
     
-    res.json({
-      status: true,
-      status_code: 200,
-      message: isMonitored ? 'EVM address is being monitored' : 'EVM address is not being monitored',
-      data: {
-        address: address.toLowerCase(),
-        isMonitored: isMonitored,
-        type: 'EVM'
-      }
-    });
+    if (isMonitored) {
+      res.json({
+        status: true,
+        status_code: 200,
+        message: 'EVM address is being monitored',
+        data: {
+          address: normalizedAddress,
+          isMonitored: true,
+          type: 'EVM'
+        }
+      });
+    } else {
+      res.json({
+        status: false,
+        status_code: 200,
+        message: 'EVM address is not being monitored',
+        data: {
+          address: normalizedAddress,
+          isMonitored: false,
+          type: 'EVM'
+        }
+      });
+    }
   } catch (error) {
     res.status(500).json({
       status: false,

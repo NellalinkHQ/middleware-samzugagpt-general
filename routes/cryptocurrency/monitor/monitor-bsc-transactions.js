@@ -90,7 +90,7 @@ function monitorBEP20Transfers() {
             throw new Error("Empty or invalid data in token transfer log");
           }
 
-         // console.log(`\n💠 BEP-20 Token Scanning!`);
+         console.log(`\n💠 BEP-20 Token Monitor Scanning!`);
 
           const value = ethers.toBigInt(log.data);
 
@@ -135,7 +135,7 @@ function monitorBNBDeposits() {
       // Update last activity
       monitorStatus.bnbMonitor.lastActivity = new Date().toISOString();
       
-      // console.log(`\n🔍 Scanning block: ${blockNumber}`);
+      console.log(`\n🔍 BNB Monitor Scanning block: ${blockNumber}`);
       try {
         const block = await httpProvider.getBlock(blockNumber);
         for (const txHash of block.transactions) {
@@ -344,7 +344,7 @@ function startMonitoringBSCTransactions() {
     setTimeout(() => {
       monitorBEP20Transfers();
       monitorBNBDeposits();
-    }, 2000); // Wait 2 seconds for WebSocket to connect
+    }, 5000); // Wait 5 seconds for WebSocket to connect
     
   } catch (error) {
     console.error('❌ Failed to start BSC monitoring:', error.message);
