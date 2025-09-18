@@ -365,10 +365,10 @@ async function fetchListTransactionsBNB(from_address, per_page = 20, page_no = 1
 
         let apiUrl;
         if(MODULE1_CRYPTOCURRENCY_BSCSCAN_NETWORK==="testnet"){
-            apiUrl = `https://api-testnet.bscscan.com/api?module=account&action=txlist&address=${address}&page=${page_no}&offset=${per_page}&startblock=${startBlock}&endblock=${endBlock}&sort=desc&apikey=${MODULE1_CRYPTOCURRENCY_BSCSCAN_API_KEY}`;
+            apiUrl = `https://api.etherscan.io/v2/api?chainid=97&module=account&action=txlist&address=${address}&page=${page_no}&offset=${per_page}&startblock=${startBlock}&endblock=${endBlock}&sort=desc&apikey=${MODULE1_CRYPTOCURRENCY_BSCSCAN_API_KEY}`;
         
         }else{
-            apiUrl = `https://api.bscscan.com/api?module=account&action=txlist&address=${address}&page=${page_no}&offset=${per_page}&startblock=${startBlock}&endblock=${endBlock}&sort=desc&apikey=${MODULE1_CRYPTOCURRENCY_BSCSCAN_API_KEY}`;
+            apiUrl = `https://api.etherscan.io/v2/api?chainid=56&module=account&action=txlist&address=${address}&page=${page_no}&offset=${per_page}&startblock=${startBlock}&endblock=${endBlock}&sort=desc&apikey=${MODULE1_CRYPTOCURRENCY_BSCSCAN_API_KEY}`;
            
         }
 
@@ -647,7 +647,7 @@ async function withdrawUserBEP20toCentralAddress(user_id, from_address, contract
 
 async function pushUserBEP20TransactionstoUserWallet(user_id, from_address, contract_address) {
 
-
+     contract_address = contract_address.toLowerCase();
 
     try {
 
@@ -882,7 +882,7 @@ async function fetchListTransactionsBEP20(from_address, contract_address, per_pa
 
         const response = await axios.get(apiUrl);
 
-        console.log(`fetchListTransactionsBEP20 response for ${contract_address}`, response);
+        //console.log(`fetchListTransactionsBEP20 response for ${contract_address}`, response);
 
 
         if (response.data.status === '1') {

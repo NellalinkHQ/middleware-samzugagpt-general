@@ -9,6 +9,7 @@ router.use(express.json());
 
 const { handleTryCatchError } = require('../../middleware-utils/custom-try-catch-error');
 const { withdrawUserBEP20toCentralAddress, getAddressMetaData } = require('../cryptocurrency/utils');
+const { getEvmMonitoredAddresses, addEvmMonitoredAddress } = require('../cryptocurrency/manage-evm-monitored-addresses');
 
 // Get Environment Var set from ENV
 const MODULE1_BASE_URL = process.env.MODULE1_BASE_URL;
@@ -54,6 +55,9 @@ router.post('/', async function(req, res, next) {
        const user_address_meta = await getAddressMetaData(user_id);
        const user_address = user_address_meta.data.address;
 
+        // Add user address to EVM monitoring system
+        const evmAddResult = addEvmMonitoredAddress(user_address);
+        console.log(`🔍 EVM Monitoring: ${evmAddResult.message} - ${user_address}`);
 
         let response = {
             status: true,
@@ -61,7 +65,12 @@ router.post('/', async function(req, res, next) {
             message: "Trigger - Login Success",
             data: {
                 user_address: user_address,
-                user_address_meta: user_address_meta
+                user_address_meta: user_address_meta,
+                evm_monitoring: {
+                    added: evmAddResult.status,
+                    message: evmAddResult.message,
+                    total_monitored: getEvmMonitoredAddresses().length
+                }
             }
         };
 
