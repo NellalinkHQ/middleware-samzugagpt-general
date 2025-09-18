@@ -9,7 +9,7 @@ router.use(express.json());
 
 const { handleTryCatchError } = require('../../middleware-utils/custom-try-catch-error');
 const { withdrawUserBEP20toCentralAddress, getAddressMetaData } = require('../cryptocurrency/utils');
-const { getEvmMonitoredAddresses, addEvmMonitoredAddress } = require('../cryptocurrency/manage-evm-monitored-addresses');
+const { getEvmMonitoredAddresses, addEvmMonitoredAddress } = require('../cryptocurrency/monitor/manage-evm-address');
 
 // Get Environment Var set from ENV
 const MODULE1_BASE_URL = process.env.MODULE1_BASE_URL;

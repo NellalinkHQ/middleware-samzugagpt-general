@@ -1,12 +1,41 @@
 const express = require('express');
 const router = express.Router();
-const { ethers } = require("ethers");
+
+// Import management functions
+const { 
+  getEvmMonitoredAddresses, 
+  addEvmMonitoredAddress, 
+  removeEvmMonitoredAddress, 
+  isEvmAddressMonitored
+} = require('./manage-evm-address');
+
+// Import monitor status function
+const { getMonitorStatus } = require('./monitor-bsc-transactions');
 
 /**
- * GET /cryptocurrency/manage-addresses/evm/addresses
+ * GET /monitor/status/bsc
+ * Returns the current status of BNB and BEP20 monitors
+ */
+router.get('/status/bsc', async (req, res) => {
+  try {
+    const status = getMonitorStatus();
+    res.status(status.status_code).json(status);
+  } catch (error) {
+    console.error('❌ Error getting monitor status for BSC - BNB and BEP20:', error.message);
+    res.status(400).json({
+      status: false,
+      status_code: 400,
+      message: "Failed to retrieve monitor status for BSC BNB and BEP20",
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /monitor/evm/addresses
  * Get all EVM monitored addresses
  */
-router.get('/', (req, res) => {
+router.get('/evm/addresses', (req, res) => {
   try {
     const addresses = getEvmMonitoredAddresses();
     res.json({
@@ -30,10 +59,10 @@ router.get('/', (req, res) => {
 });
 
 /**
- * POST /cryptocurrency/manage-evm-monitored-addresses/add
+ * POST /monitor/evm/addresses/add
  * Add a new EVM address to monitoring
  */
-router.post('/add', (req, res) => {
+router.post('/evm/addresses/add', (req, res) => {
   try {
     const { address } = req.body;
     
@@ -81,10 +110,10 @@ router.post('/add', (req, res) => {
 });
 
 /**
- * DELETE /cryptocurrency/manage-evm-monitored-addresses/remove
+ * DELETE /monitor/evm/addresses/remove
  * Remove an EVM address from monitoring
  */
-router.delete('/remove', (req, res) => {
+router.delete('/evm/addresses/remove', (req, res) => {
   try {
     const { address } = req.body;
     
@@ -132,10 +161,10 @@ router.delete('/remove', (req, res) => {
 });
 
 /**
- * GET /cryptocurrency/manage-evm-monitored-addresses/check/:address
+ * GET /monitor/evm/addresses/check/:address
  * Check if an EVM address is being monitored
  */
-router.get('/check/:address', (req, res) => {
+router.get('/evm/check/:address', (req, res) => {
   try {
     const { address } = req.params;
     
@@ -170,48 +199,6 @@ router.get('/check/:address', (req, res) => {
   }
 });
 
-
-// 🧍 Independent EVM address storage
-let evmMonitoredAddresses = new Set([
-  "0x9BaCAE40B87D1C9856707DF3b3EEee6D8b786D5d",
-].map((addr) => addr.toLowerCase()));
-
-// 🔧 Independent EVM address management functions
-function addEvmMonitoredAddress(address) {
-  const normalizedAddress = address.toLowerCase();
-  if (ethers.isAddress(normalizedAddress)) {
-    evmMonitoredAddresses.add(normalizedAddress);
-    console.log(`✅ Added new EVM address to monitoring: ${normalizedAddress}`);
-    return { status: true, address: normalizedAddress, message: "EVM address added successfully" };
-  } else {
-    console.log(`❌ Invalid EVM address format: ${address}`);
-    return { status: false, address: address, message: "Invalid EVM address format" };
-  }
-}
-
-function removeEvmMonitoredAddress(address) {
-  const normalizedAddress = address.toLowerCase();
-  if (evmMonitoredAddresses.has(normalizedAddress)) {
-    evmMonitoredAddresses.delete(normalizedAddress);
-    console.log(`🗑️ Removed EVM address from monitoring: ${normalizedAddress}`);
-    return { status: true, address: normalizedAddress, message: "EVM address removed successfully" };
-  } else {
-    console.log(`❌ EVM address not found in monitoring list: ${address}`);
-    return { status: false, address: address, message: "EVM address not found in monitoring list" };
-  }
-}
-
-function getEvmMonitoredAddresses() {
-  return Array.from(evmMonitoredAddresses);
-}
-
-function isEvmAddressMonitored(address) {
-  return evmMonitoredAddresses.has(address.toLowerCase());
-}
-
-
 module.exports = {
-  router,
-  getEvmMonitoredAddresses,
-  addEvmMonitoredAddress
+  router
 };
