@@ -90,7 +90,7 @@ function monitorBEP20Transfers() {
             throw new Error("Empty or invalid data in token transfer log");
           }
 
-         console.log(`\n💠 BEP-20 Token Monitor Scanning!`);
+         // console.log(`\n💠 BEP-20 Token Monitor Scanning!`);
 
           const value = ethers.toBigInt(log.data);
 
@@ -135,7 +135,8 @@ function monitorBNBDeposits() {
       // Update last activity
       monitorStatus.bnbMonitor.lastActivity = new Date().toISOString();
       
-      console.log(`\n🔍 BNB Monitor Scanning block: ${blockNumber}`);
+      // console.log(`\n🔍 BNB Monitor Scanning block: ${blockNumber}`);
+
       try {
         const block = await httpProvider.getBlock(blockNumber);
         for (const txHash of block.transactions) {
