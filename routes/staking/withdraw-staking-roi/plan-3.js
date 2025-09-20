@@ -177,15 +177,11 @@ router.post('/:stakingTransactionID', async function(req, res, next) {
             }
         }
 
-        // Step 1: Debit the ROI wallet
-        const debitRequestBody = buildRoiDebitRequestBody(request_id, user_id, amount_to_withdraw, stakingTransactionID, stakingMetaData, stakingMetrics, fee_transaction_id, fee_amount, fee_wallet);
-        const debitResponse = await createDebitTransaction(userBearerJWToken, debitRequestBody);
-
-        // Step 2: Credit the user's main wallet
-        const creditRequestBody = buildRoiCreditRequestBody(request_id, user_id, amount_to_withdraw, stakingTransactionID, stakingMetaData, stakingMetrics, debitResponse.data.data.transaction_id, fee_transaction_id, fee_amount, fee_wallet);
+        // Step 1: Credit the user's main wallet directly
+        const creditRequestBody = buildRoiCreditRequestBody(request_id, user_id, amount_to_withdraw, stakingTransactionID, stakingMetaData, stakingMetrics, null, fee_transaction_id, fee_amount, fee_wallet);
         const creditResponse = await createCreditTransaction(userBearerJWToken, creditRequestBody);
 
-        // Step 3: Update staking meta with withdrawal information
+        // Step 2: Update staking meta with withdrawal information
         const currentTime = Math.floor(Date.now() / 1000);
         const updateMetaRequestBody = buildUpdateStakingRequestBody(stakingTransactionID, stakingMetaData, amount_to_withdraw, currentTime, stakingMetrics, false, creditResponse.data.data.transaction_id, request_id);
         await updateStakingMeta(stakingTransactionID, userBearerJWToken, updateMetaRequestBody);
@@ -341,7 +337,7 @@ router.post('/blockchain-external/:stakingTransactionID', async (req, res) => {
         }
 
         // Step 1: Credit the ROI wallet
-        const creditRequestBody = buildRoiCreditRequestBody(request_id, user_id, amount_to_withdraw, stakingTransactionID, stakingMetaData, stakingMetrics);
+        const creditRequestBody = buildRoiCreditRequestBody(request_id, user_id, amount_to_withdraw, stakingTransactionID, stakingMetaData, stakingMetrics, null, fee_transaction_id, fee_amount, fee_wallet);
         const creditResponse = await createCreditTransaction(userBearerJWToken, creditRequestBody);
 
         // Step 2: Update staking meta with withdrawal information (after credit)
