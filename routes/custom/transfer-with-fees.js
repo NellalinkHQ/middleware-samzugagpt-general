@@ -16,6 +16,10 @@ const MODULE1_BASE_URL = process.env.MODULE1_BASE_URL;
 const MODULE1_BASE_API_KEY = process.env.MODULE1_BASE_API_KEY;
 const MODULE1_BASE_USER_JWT_SECRET_KEY = process.env.MODULE1_BASE_USER_JWT_SECRET_KEY;
 
+// Cache for transfer limits (1 hour TTL)
+const transferLimitsCache = new Map();
+const CACHE_TTL = 60 * 60 * 1000; // 1 hour in milliseconds
+
 
 
 router.post('/', async function(req, res, next) {
@@ -50,54 +54,60 @@ router.post('/', async function(req, res, next) {
             });
         }
 
-       let fees = { 
-                    usdt_staking_interest: { 
-                        transfer_fee: 10,
-                        transfer_percentage_discount: 0.1
-                    },
-                    hcc: { 
-                        transfer_fee: 15000,
-                        transfer_percentage_discount: 0 // Assuming a value, you need to replace it with the actual value.
-                    }
-                };
-
-        let amount_with_discount = amount - (amount * fees[wallet_id].transfer_percentage_discount);
-
-        // Correctly accessing the fee based on wallet_id
-        let amount_with_fee = amount_with_discount + fees[wallet_id].transfer_fee;
+        // Fetch dynamic transfer limits
+        const transferLimits = await fetchTransferLimits(wallet_id, userBearerJWToken);
+        const { minimum_transfer_amount, maximum_transfer_amount, transfer_fee } = transferLimits;
 
         //main deal
         let wallet_id_fee = "szcb2";
-        let amount_fee = 0.1;
-        let min_amount_transfer = 5;
-        let max_amount_transfer = 10000;
+        let amount_fee = transfer_fee || 0; // Use 0 if transfer_fee is null
+        let min_amount_transfer = minimum_transfer_amount;
+        let max_amount_transfer = maximum_transfer_amount;
 
-        if (amount < min_amount_transfer) {
+        if (amount <= 0) {
             let response = {
                 status: false,
                 status_code: 400,
-                message: `Amount is too low. Minimum allowed is ${min_amount_transfer}.`,
+                message: "Transfer amount must be greater than 0",
                 error: {
                     error_data: {
                         amount: amount,
-                        min_amount: min_amount_transfer,
-                        max_amount: max_amount_transfer
+                        min_amount: minimum_transfer_amount === null ? "No minimum" : minimum_transfer_amount,
+                        max_amount: maximum_transfer_amount === null ? "No limit" : maximum_transfer_amount
                     }
                 }
             };
             return res.status(400).send(response);
         }
 
-        if (amount > max_amount_transfer) {
+        // Only check minimum limit if it's set and greater than 0
+        if (minimum_transfer_amount !== null && amount < minimum_transfer_amount) {
             let response = {
                 status: false,
                 status_code: 400,
-                message: `Amount exceeds the maximum allowed. Maximum is ${max_amount_transfer}.`,
+                message: `Amount is too low. Minimum allowed is ${minimum_transfer_amount}.`,
                 error: {
                     error_data: {
                         amount: amount,
-                        min_amount: min_amount_transfer,
-                        max_amount: max_amount_transfer
+                        min_amount: minimum_transfer_amount,
+                        max_amount: maximum_transfer_amount === null ? "No limit" : maximum_transfer_amount
+                    }
+                }
+            };
+            return res.status(400).send(response);
+        }
+
+        // Only check maximum limit if it's set
+        if (maximum_transfer_amount !== null && amount > maximum_transfer_amount) {
+            let response = {
+                status: false,
+                status_code: 400,
+                message: `Amount exceeds the maximum allowed. Maximum is ${maximum_transfer_amount}.`,
+                error: {
+                    error_data: {
+                        amount: amount,
+                        min_amount: minimum_transfer_amount === null ? "No minimum" : minimum_transfer_amount,
+                        max_amount: maximum_transfer_amount
                     }
                 }
             };
@@ -106,12 +116,14 @@ router.post('/', async function(req, res, next) {
 
 
 
-        // Step *: Check balance of user
-        // Create userbalanceCheck middleware with parameters extracted from request body
-        const balanceCheckResultFee = await userWalletBalanceCheckUtils(MODULE1_BASE_URL, MODULE1_BASE_API_KEY, userBearerJWToken, user_id, wallet_id_fee, amount_fee);
-        if (balanceCheckResultFee.status!=true) {
-            console.log("balanceCheckResultFee Not Sufficient ", balanceCheckResultFee);
-            return res.status(400).send(balanceCheckResultFee);// Return if balance Result Fee is not sufficient
+        // Step *: Check balance of user for fee (only if fee > 0)
+        let balanceCheckResultFee = { status: true }; // Default to success if no fee
+        if (amount_fee > 0) {
+            balanceCheckResultFee = await userWalletBalanceCheckUtils(MODULE1_BASE_URL, MODULE1_BASE_API_KEY, userBearerJWToken, user_id, wallet_id_fee, amount_fee);
+            if (balanceCheckResultFee.status!=true) {
+                console.log("balanceCheckResultFee Not Sufficient ", balanceCheckResultFee);
+                return res.status(400).send(balanceCheckResultFee);// Return if balance Result Fee is not sufficient
+            }
         }
 
 
@@ -151,39 +163,42 @@ router.post('/', async function(req, res, next) {
         const user_id_transfer_to = user_meta_response.data.data[meta_key].user_id;
 
        
-        // Step : Debit user fee
-        const debit_url_fee = `${MODULE1_BASE_URL}/wp-json/rimplenet/v1/debits`;
-        const debit_fee_request_body = {
-            "request_id": `user_to_user_transfer_debit_fee_${request_id}`,
-            "user_id": user_id,
-            "amount": amount_fee,
-            "wallet_id": wallet_id_fee,
-            "note": `Fee - Transfer to Internal User`,
-             "meta_data": {
-                "user_id_transfer_from": user_id,
-                "user_id_transfer_to": user_id_transfer_to, //AS WAS RETRIEVED DYNAMICALLY
-                "user_meta_key_transfer_to": meta_key,
-                "user_meta_value_transfer_to": meta_value,
-                "transaction_type_action_type": "user_to_user_transfer_fee",
-                "transaction_type_category": "internal_transfer_fee",
-                "transaction_external_processor": "middleware1_module1",
-                "transaction_approval_status": "user_middleware_processed",
-                "transaction_approval_method": "middleware",
-              },
-        };
+        // Step : Debit user fee (only if fee > 0)
+        let debit_transaction_response_fee = { status: true }; // Default to success if no fee
+        if (amount_fee > 0) {
+            const debit_url_fee = `${MODULE1_BASE_URL}/wp-json/rimplenet/v1/debits`;
+            const debit_fee_request_body = {
+                "request_id": `user_to_user_transfer_debit_fee_${request_id}`,
+                "user_id": user_id,
+                "amount": amount_fee,
+                "wallet_id": wallet_id_fee,
+                "note": `Fee - Transfer to Internal User`,
+                 "meta_data": {
+                    "user_id_transfer_from": user_id,
+                    "user_id_transfer_to": user_id_transfer_to, //AS WAS RETRIEVED DYNAMICALLY
+                    "user_meta_key_transfer_to": meta_key,
+                    "user_meta_value_transfer_to": meta_value,
+                    "transaction_type_action_type": "user_to_user_transfer_fee",
+                    "transaction_type_category": "internal_transfer_fee",
+                    "transaction_external_processor": "middleware1_module1",
+                    "transaction_approval_status": "user_middleware_processed",
+                    "transaction_approval_method": "middleware",
+                  },
+            };
 
-        const debit_response_fee = await axios.post(debit_url_fee, debit_fee_request_body, {
-            headers: {
-                'x-api-key': MODULE1_BASE_API_KEY,
-                'Authorization': `Bearer ${userBearerJWToken}` // Append JWT Bearer token to headers
-            }
-        });
-        const debit_transaction_response_fee = debit_response_fee.data;
+            const debit_response_fee = await axios.post(debit_url_fee, debit_fee_request_body, {
+                headers: {
+                    'x-api-key': MODULE1_BASE_API_KEY,
+                    'Authorization': `Bearer ${userBearerJWToken}` // Append JWT Bearer token to headers
+                }
+            });
+            debit_transaction_response_fee = debit_response_fee.data;
 
-        console.log(debit_response_fee.data.status);
+            console.log(debit_response_fee.data.status);
+        }
 
         let debit_transaction_response;
-        if (debit_response_fee.data.status) {// meaning debit was succesdful
+        if (debit_transaction_response_fee.status) {// meaning debit was successful (or no fee to charge)
    
             // Step 2: Debit user 
             const debit_url = `${MODULE1_BASE_URL}/wp-json/rimplenet/v1/debits`;
@@ -255,33 +270,36 @@ router.post('/', async function(req, res, next) {
 
 
 
-        // Step 3: Credit Fee to User 1
-        const credit_url_fee = `${MODULE1_BASE_URL}/wp-json/rimplenet/v1/credits`;
-        const credit_request_body_fee = {
-            "request_id": `fee_user_to_user_transfer_credit_${request_id}`,
-            "user_id": 1,
-            "amount": amount_fee,
-            "wallet_id": wallet_id_fee,
-            "note": `Fee - Transfer from Internal User`,
-             "meta_data": {
-                "user_id_transfer_from": user_id,
-                "user_id_transfer_to": user_id_transfer_to, //AS WAS RETRIEVED DYNAMICALLY
-                "user_meta_key_transfer_to": meta_key,
-                "user_meta_value_transfer_to": meta_value,
-                "transaction_type_action_type": "fee_user_to_user_transfer",
-                "transaction_type_category": "fee_internal_transfer",
-                "transaction_external_processor": "middleware1_module1",
-                "transaction_approval_status": "user_middleware_processed",
-                "transaction_approval_method": "middleware",
-              },
-        };
+        // Step 3: Credit Fee to User 1 (only if fee > 0)
+        let credit_transaction_response_fee = { status: true }; // Default to success if no fee
+        if (amount_fee > 0) {
+            const credit_url_fee = `${MODULE1_BASE_URL}/wp-json/rimplenet/v1/credits`;
+            const credit_request_body_fee = {
+                "request_id": `fee_user_to_user_transfer_credit_${request_id}`,
+                "user_id": 1,
+                "amount": amount_fee,
+                "wallet_id": wallet_id_fee,
+                "note": `Fee - Transfer from Internal User`,
+                 "meta_data": {
+                    "user_id_transfer_from": user_id,
+                    "user_id_transfer_to": user_id_transfer_to, //AS WAS RETRIEVED DYNAMICALLY
+                    "user_meta_key_transfer_to": meta_key,
+                    "user_meta_value_transfer_to": meta_value,
+                    "transaction_type_action_type": "fee_user_to_user_transfer",
+                    "transaction_type_category": "fee_internal_transfer",
+                    "transaction_external_processor": "middleware1_module1",
+                    "transaction_approval_status": "user_middleware_processed",
+                    "transaction_approval_method": "middleware",
+                  },
+            };
 
-        const credit_response_fee = await axios.post(credit_url_fee, credit_request_body_fee, {
-            headers: {
-                'x-api-key': MODULE1_BASE_API_KEY
-            }
-        });
-        credit_transaction_response_fee = credit_response_fee.data;
+            const credit_response_fee = await axios.post(credit_url_fee, credit_request_body_fee, {
+                headers: {
+                    'x-api-key': MODULE1_BASE_API_KEY
+                }
+            });
+            credit_transaction_response_fee = credit_response_fee.data;
+        }
 
 
 
@@ -296,8 +314,17 @@ router.post('/', async function(req, res, next) {
                 debit_transaction_response_fee : debit_transaction_response_fee,
                 debit_transaction_response : debit_transaction_response,
                 credit_transaction_response : credit_transaction_response,
-                credit_transaction_response_fee : credit_transaction_response_fee
-
+                credit_transaction_response_fee : credit_transaction_response_fee,
+                transfer_details: {
+                    transfer_amount: amount,
+                    transfer_fee: transfer_fee || 0,
+                    wallet_id: wallet_id,
+                    limits: {
+                        minimum: minimum_transfer_amount === null ? "No minimum" : minimum_transfer_amount,
+                        maximum: maximum_transfer_amount === null ? "No limit" : maximum_transfer_amount,
+                        fee: transfer_fee === null ? "No fee" : transfer_fee
+                    }
+                }
             }
         };
         return res.send(response);
@@ -349,5 +376,112 @@ const validationTransferViaUserMeta = (req, res, next) => {
         };
   }
 };
+
+/**
+ * Fetch transfer limits dynamically based on wallet_id with 1-hour caching
+ * @param {string} wallet_id - The wallet ID to get limits for
+ * @param {string} userBearerJWToken - JWT token for authentication
+ * @returns {Object} Object containing min, max, and fee amounts
+ */
+async function fetchTransferLimits(wallet_id, userBearerJWToken) {
+    const cacheKey = `transfer_limits_${wallet_id}`;
+    const now = Date.now();
+    
+    // Check cache first
+    const cached = transferLimitsCache.get(cacheKey);
+    if (cached && (now - cached.timestamp) < CACHE_TTL) {
+        console.log(`Using cached transfer limits for ${wallet_id}`);
+        return cached.data;
+    }
+
+    try {
+        const metaKeys = `transfee_fee_${wallet_id},minimum_transfer_amount_${wallet_id},maxmum_transfer_amount_${wallet_id}`;
+        const url = `${MODULE1_BASE_URL}/wp-json/nellalink/v2/smart-meta-manager/site-wide?meta_key=${metaKeys}`;
+        
+        const response = await axios.get(url, {
+            headers: {
+                'x-api-key': MODULE1_BASE_API_KEY,
+                'Authorization': `Bearer ${userBearerJWToken}`
+            },
+            timeout: 10000 // 10 second timeout
+        });
+
+        const data = response.data.data || {};
+        
+        // Handle the API response format properly
+        // Values can be false (not set), string numbers, or actual numbers
+        const getValueOrDefault = (value, type) => {
+            if (value === false || value === null || value === undefined || value === '') {
+                if (type === 'fee') return null; // No fee to charge
+                if (type === 'minimum') return null; // No minimum limit to check
+                if (type === 'maximum') return null; // No maximum limit to check
+                return null;
+            }
+            
+            const parsed = parseFloat(value);
+            if (isNaN(parsed)) {
+                if (type === 'fee') return null; // No fee to charge
+                if (type === 'minimum') return null; // No minimum limit to check
+                if (type === 'maximum') return null; // No maximum limit to check
+                return null;
+            }
+            
+            // Handle specific type logic
+            if (type === 'fee') {
+                return parsed <= 0 ? null : parsed; // Negative, 0, or false = no fee
+            }
+            if (type === 'minimum') {
+                return parsed <= 0 ? null : parsed; // 0 or negative = no minimum limit
+            }
+            if (type === 'maximum') {
+                return parsed <= 0 ? null : parsed; // 0 or negative = no maximum limit
+            }
+            
+            return parsed;
+        };
+        
+        // Extract values with proper handling of false/string values
+        const minimum_transfer_amount = getValueOrDefault(data[`minimum_transfer_amount_${wallet_id}`], 'minimum');
+        const maximum_transfer_amount = getValueOrDefault(data[`maxmum_transfer_amount_${wallet_id}`], 'maximum');
+        const transfer_fee = getValueOrDefault(data[`transfee_fee_${wallet_id}`], 'fee');
+
+        const result = {
+            minimum_transfer_amount,
+            maximum_transfer_amount,
+            transfer_fee,
+            success: true,
+            cached_at: new Date().toISOString()
+        };
+
+        // Cache the result
+        transferLimitsCache.set(cacheKey, {
+            data: result,
+            timestamp: now
+        });
+
+        console.log(`Fetched and cached transfer limits for ${wallet_id}:`, result);
+        return result;
+    } catch (error) {
+        console.error('Error fetching transfer limits:', error);
+        
+        // Return default values if API call fails
+        const fallbackResult = {
+            minimum_transfer_amount: null, // No minimum limit
+            maximum_transfer_amount: null, // No maximum limit
+            transfer_fee: null, // No fee
+            success: false,
+            error: error.message,
+            cached_at: new Date().toISOString()
+        };
+
+        // Cache the fallback result as well to prevent repeated failed API calls
+        transferLimitsCache.set(cacheKey, {
+            data: fallbackResult,
+            timestamp: now
+        });
+
+        return fallbackResult;
+    }
+}
 
 module.exports = router;
