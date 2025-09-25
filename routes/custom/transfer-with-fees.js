@@ -395,7 +395,7 @@ async function fetchTransferLimits(wallet_id, userBearerJWToken) {
     }
 
     try {
-        const metaKeys = `transfee_fee_${wallet_id},minimum_transfer_amount_${wallet_id},maxmum_transfer_amount_${wallet_id}`;
+        const metaKeys = `transfee_fee_${wallet_id},minimum_transfer_amount_${wallet_id},maximum_transfer_amount_${wallet_id}`;
         const url = `${MODULE1_BASE_URL}/wp-json/nellalink/v2/smart-meta-manager/site-wide?meta_key=${metaKeys}`;
         
         const response = await axios.get(url, {
@@ -442,7 +442,7 @@ async function fetchTransferLimits(wallet_id, userBearerJWToken) {
         
         // Extract values with proper handling of false/string values
         const minimum_transfer_amount = getValueOrDefault(data[`minimum_transfer_amount_${wallet_id}`], 'minimum');
-        const maximum_transfer_amount = getValueOrDefault(data[`maxmum_transfer_amount_${wallet_id}`], 'maximum');
+        const maximum_transfer_amount = getValueOrDefault(data[`maximum_transfer_amount_${wallet_id}`], 'maximum');
         const transfer_fee = getValueOrDefault(data[`transfee_fee_${wallet_id}`], 'fee');
 
         const result = {
