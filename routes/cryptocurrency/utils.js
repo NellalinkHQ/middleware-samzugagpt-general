@@ -23,6 +23,33 @@ const MODULE1_CRYPTOCURRENCY_AIRDROP_FEE_PAYER_ADDRESS_PRIVATE_KEY = process.env
 const MODULE1_CRYPTOCURRENCY_AIRDROP_FEE_PAYER_ADDRESS = process.env.MODULE1_CRYPTOCURRENCY_AIRDROP_FEE_PAYER_ADDRESS.toLowerCase();
 const MODULE1_CRYPTOCURRENCY_CENTRAL_WITHDRAWAL_TO_ADDRESS = process.env.MODULE1_CRYPTOCURRENCY_CENTRAL_WITHDRAWAL_TO_ADDRESS.toLowerCase();
 
+// BEP20 Token Contract Address Mapping with Decimals
+// Add new tokens here by mapping wallet_id to { address, decimals }
+const BEP20_TOKEN_CONTRACTS = {
+    // Mainnet contracts
+    mainnet: {
+        'usdt': { address: '0x55d398326f99059fF775485246999027B3197955', decimals: 18 },
+        'usdt_staking_interest': { address: '0x55d398326f99059fF775485246999027B3197955', decimals: 18 },
+        'usdc': { address: '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d', decimals: 18 }, // USDC on BSC
+        'busd': { address: '0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56', decimals: 18 }, // BUSD on BSC
+        'dai': { address: '0x1AF3F329e8BE154074D8769D1FFa4eE058B1DBc3', decimals: 18 }, // DAI on BSC
+        'eth': { address: '0x2170Ed0880ac9A755fd29B2688956BD959F933F8', decimals: 18 }, // ETH on BSC
+        'btc': { address: '0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c', decimals: 18 }, // BTCB on BSC
+        'bnb': { address: '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c', decimals: 18 }, // WBNB on BSC
+        'szcb': { address: '0x702371e0897f5e2f566b1ce8256856d0549c5857', decimals: 8 }, // SZCB on BSC
+        'szcb2': { address: '0xb4e62a01909f49fc30de2bf92f3a554f2f636360', decimals: 18 }, // SZCB2 on BSC
+        'szcbii': { address: '0xfd0310733a6718167834c1fcdffdedb80b44e9d3', decimals: 18 }, // SZCBII on BSC
+        'hhc': { address: '0x6cf3cce0b577516bbc63828743e0e75ab41f1c01', decimals: 18 }, // HHC on BSC
+        // Add more tokens as needed
+    },
+    // Testnet contracts
+    testnet: {
+        'usdt': { address: '0x337610d27c682E347C9cD60BD4b3b107C9d34dDd', decimals: 18 },
+        'usdc': { address: '0x64544969ed7EBf5f083679233325356EbE738930', decimals: 18 }, // USDC on BSC Testnet
+        'busd': { address: '0x78867BbEeF44f2326bF8DDd1941a4439382EF2A7', decimals: 18 }, // BUSD on BSC Testnet
+        // Add more testnet tokens as needed
+    }
+};
 
 //const MODULE1_CRYPTOCURRENCY_ALLOWED_BEP20_CONTRACT_ADDRESS = process.env.MODULE1_CRYPTOCURRENCY_ALLOWED_BEP20_CONTRACT_ADDRESS.toLowerCase();
 // const MODULE1_CRYPTOCURRENCY_ALLOWED_BEP20_CONTRACT_ADDRESS  = [{
@@ -1424,6 +1451,90 @@ function convertBigIntToInt(obj) {
     }
 }
 
+/**
+ * Get BEP20 token contract information by wallet_id
+ * @param {string} wallet_id - The wallet ID (e.g., 'usdt', 'usdc', 'busd')
+ * @param {string} network - The network ('mainnet' or 'testnet')
+ * @returns {Object|null} Token contract info with address and decimals, or null if not found
+ */
+function getBep20TokenContract(wallet_id, network = MODULE1_CRYPTOCURRENCY_BSCSCAN_NETWORK) {
+    const networkKey = network.toLowerCase();
+    
+    if (!BEP20_TOKEN_CONTRACTS[networkKey]) {
+        console.warn(`⚠️ Network ${networkKey} not found in BEP20_TOKEN_CONTRACTS`);
+        return null;
+    }
+    
+    const tokenInfo = BEP20_TOKEN_CONTRACTS[networkKey][wallet_id.toLowerCase()];
+    
+    if (!tokenInfo) {
+        console.warn(`⚠️ Token ${wallet_id} not found for network ${networkKey}`);
+        return null;
+    }
+    
+    return {
+        address: tokenInfo.address,
+        decimals: tokenInfo.decimals
+    };
+}
+
+/**
+ * Get all BEP20 token contract addresses for a specific network
+ * @param {string} network - The network ('mainnet' or 'testnet')
+ * @returns {Array} Array of unique token contract addresses
+ */
+function getAllBep20TokenAddresses(network = MODULE1_CRYPTOCURRENCY_BSCSCAN_NETWORK) {
+    const networkKey = network.toLowerCase();
+    
+    if (!BEP20_TOKEN_CONTRACTS[networkKey]) {
+        console.warn(`⚠️ Network ${networkKey} not found in BEP20_TOKEN_CONTRACTS`);
+        return [];
+    }
+    
+    // Get all addresses and remove duplicates
+    const allAddresses = Object.values(BEP20_TOKEN_CONTRACTS[networkKey]).map(token => token.address);
+    return [...new Set(allAddresses)]; // Remove duplicates
+}
+
+/**
+ * Check if a wallet_id exists in the BEP20 token contracts
+ * @param {string} wallet_id - The wallet ID to check
+ * @param {string} network - The network ('mainnet' or 'testnet')
+ * @returns {boolean} True if the wallet_id exists, false otherwise
+ */
+function isValidBep20WalletId(wallet_id, network = MODULE1_CRYPTOCURRENCY_BSCSCAN_NETWORK) {
+    const networkKey = network.toLowerCase();
+    
+    if (!BEP20_TOKEN_CONTRACTS[networkKey]) {
+        return false;
+    }
+    
+    return wallet_id.toLowerCase() in BEP20_TOKEN_CONTRACTS[networkKey];
+}
+
+/**
+ * Get wallet_id by contract address
+ * @param {string} contractAddress - The contract address to look up
+ * @param {string} network - The network ('mainnet' or 'testnet')
+ * @returns {string|null} The wallet_id if found, null otherwise
+ */
+function getWalletIdByContractAddress(contractAddress, network = MODULE1_CRYPTOCURRENCY_BSCSCAN_NETWORK) {
+    const networkKey = network.toLowerCase();
+    const address = contractAddress.toLowerCase();
+    
+    if (!BEP20_TOKEN_CONTRACTS[networkKey]) {
+        return null;
+    }
+    
+    for (const [walletId, tokenInfo] of Object.entries(BEP20_TOKEN_CONTRACTS[networkKey])) {
+        if (tokenInfo.address.toLowerCase() === address) {
+            return walletId;
+        }
+    }
+    
+    return null;
+}
+
 // Export the router and the function
 module.exports = {
     withdrawUserBNBtoCentralAddress: withdrawUserBNBtoCentralAddress,
@@ -1433,5 +1544,12 @@ module.exports = {
     payGasFeeInternal : payGasFeeInternal,
     fillGasFee: fillGasFee,
     getAddressMetaData : getAddressMetaData,
-    getContractAbi: getContractAbi
+    getContractAbi: getContractAbi,
+    // BEP20 Token Contract utilities
+    getBep20TokenContract: getBep20TokenContract,
+    getAllBep20TokenAddresses: getAllBep20TokenAddresses,
+    isValidBep20WalletId: isValidBep20WalletId,
+    getWalletIdByContractAddress: getWalletIdByContractAddress,
+    // Export the token contracts mapping for direct access if needed
+    BEP20_TOKEN_CONTRACTS: BEP20_TOKEN_CONTRACTS
 };

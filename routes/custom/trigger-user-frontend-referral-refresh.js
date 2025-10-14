@@ -57,6 +57,8 @@ router.post('/', async function(req, res, next) {
              const referral_bonus_setting_metas = {               
                                 "usdt": { "percentage_for_referrer_sponsor_on_deposit_1": "5%"},
                                 "szcb": { "percentage_for_referrer_sponsor_on_deposit_1": "5%"},
+                                "szcbii": { "percentage_for_referrer_sponsor_on_deposit_1": "5%"},
+                                "hhc": { "percentage_for_referrer_sponsor_on_deposit_1": "5%"},
                                 "bnb": { "percentage_for_referrer_sponsor_on_deposit_1": "5%"}
                             };
              payReferralBonustoReferrerSponsorDisplay = await payReferralBonustoReferrerSponsor(user_id, "pattern_1", referral_bonus_setting_metas );

@@ -17,6 +17,9 @@ const { handleTryCatchError } = require('../../middleware-utils/custom-try-catch
 // Import the approveWithdrawalTransaction function 
 const { approveWithdrawalTransaction } = require('../withdrawal/utils');
 
+// Import cryptocurrency utils to get BEP20 token contract info
+const { getBep20TokenContract } = require('./utils');
+
 // Initialize ENV 
 const MODULE1_BASE_URL = process.env.MODULE1_BASE_URL;
 const MODULE1_BASE_API_KEY = process.env.MODULE1_BASE_API_KEY;
@@ -35,33 +38,7 @@ const MODULE1_CRYPTOCURRENCY_CENTRAL_WITHDRAWAL_TO_ADDRESS = process.env.MODULE1
 const MODULE1_CRYPTOCURRENCY_WITHDRAWAL_ADDRESS_FROM_PRIVATE_KEY = process.env.MODULE1_CRYPTOCURRENCY_WITHDRAWAL_ADDRESS_FROM_PRIVATE_KEY;
 const MODULE1_CRYPTOCURRENCY_WITHDRAWAL_ADDRESS_FROM = process.env.MODULE1_CRYPTOCURRENCY_WITHDRAWAL_ADDRESS_FROM;
 
-// BEP20 Token Contract Address Mapping with Decimals
-// Add new tokens here by mapping wallet_id to { address, decimals }
-const BEP20_TOKEN_CONTRACTS = {
-    // Mainnet contracts
-    mainnet: {
-        'usdt': { address: '0x55d398326f99059fF775485246999027B3197955', decimals: 18 },
-        'usdt_staking_interest': { address: '0x55d398326f99059fF775485246999027B3197955', decimals: 18 },
-        'usdc': { address: '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d', decimals: 18 }, // USDC on BSC
-        'busd': { address: '0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56', decimals: 18 }, // BUSD on BSC
-        'dai': { address: '0x1AF3F329e8BE154074D8769D1FFa4eE058B1DBc3', decimals: 18 }, // DAI on BSC
-        'eth': { address: '0x2170Ed0880ac9A755fd29B2688956BD959F933F8', decimals: 18 }, // ETH on BSC
-        'btc': { address: '0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c', decimals: 18 }, // BTCB on BSC
-        'bnb': { address: '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c', decimals: 18 }, // WBNB on BSC
-        'szcb': { address: '0x702371e0897f5e2f566b1ce8256856d0549c5857', decimals: 8 }, // SZCB on BSC
-        'szcb2': { address: '0xb4e62a01909f49fc30de2bf92f3a554f2f636360', decimals: 18 }, // SZCB2 on BSC
-        'szcbii': { address: '0xfd0310733a6718167834c1fcdffdedb80b44e9d3', decimals: 18 }, // SZCBII on BSC
-        'hhc': { address: '0x6cf3cce0b577516bbc63828743e0e75ab41f1c01', decimals: 18 }, // HHC on BSC
-        // Add more tokens as needed
-    },
-    // Testnet contracts
-    testnet: {
-        'usdt': { address: '0x337610d27c682E347C9cD60BD4b3b107C9d34dDd', decimals: 18 },
-        'usdc': { address: '0x64544969ed7EBf5f083679233325356EbE738930', decimals: 18 }, // USDC on BSC Testnet
-        'busd': { address: '0x78867BbEeF44f2326bF8DDd1941a4439382EF2A7', decimals: 18 }, // BUSD on BSC Testnet
-        // Add more testnet tokens as needed
-    }
-};
+// BEP20 Token Contract mapping is now imported from utils.js
 
 let web3_http, web3_wss, abiFilePathtoABI;
 try {
@@ -166,7 +143,7 @@ router.put('/approve/:transactionID', async function(req, res, next) {
         }
 
         // Get token info for the token and network
-        const tokenInfo = getTokenInfo(wallet_id, MODULE1_CRYPTOCURRENCY_BSCSCAN_NETWORK);
+        const tokenInfo = getBep20TokenContract(wallet_id, MODULE1_CRYPTOCURRENCY_BSCSCAN_NETWORK);
         if (!tokenInfo) {
             return res.status(400).json({
                 status: false,
@@ -174,11 +151,10 @@ router.put('/approve/:transactionID', async function(req, res, next) {
                 message: "Unsupported token",
                 error: {
                     message: `Token ${wallet_id} is not supported`,
-                    recommendation: `Add ${wallet_id} to BEP20_TOKEN_CONTRACTS mapping`,
+                    recommendation: `Add ${wallet_id} to BEP20_TOKEN_CONTRACTS mapping in utils.js`,
                     error_data: {
                         token: wallet_id,
-                        network: MODULE1_CRYPTOCURRENCY_BSCSCAN_NETWORK,
-                        supported_tokens: Object.keys(BEP20_TOKEN_CONTRACTS[MODULE1_CRYPTOCURRENCY_BSCSCAN_NETWORK] || {})
+                        network: MODULE1_CRYPTOCURRENCY_BSCSCAN_NETWORK
                     }
                 }
             });
@@ -384,6 +360,8 @@ async function getBEP20Abi() {
  */
 router.get('/supported-tokens', async function(req, res, next) {
     try {
+        // Import the token contracts mapping from utils
+        const { BEP20_TOKEN_CONTRACTS } = require('./utils');
         const supportedTokens = BEP20_TOKEN_CONTRACTS[MODULE1_CRYPTOCURRENCY_BSCSCAN_NETWORK] || {};
         const tokenList = Object.keys(supportedTokens).map(token => ({
             symbol: token.toUpperCase(),

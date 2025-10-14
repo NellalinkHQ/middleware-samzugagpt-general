@@ -6,37 +6,65 @@ const MODULE1_BASE_URL = process.env.MODULE1_BASE_URL;
 const MODULE1_BASE_API_KEY = process.env.MODULE1_BASE_API_KEY;
 const MODULE1_BASE_USER_JWT_SECRET_KEY = process.env.MODULE1_BASE_USER_JWT_SECRET_KEY;
 
-
 async function fetchReferredUsers(user_id, per_page = 5, page_no = 1, retrieve_paid_users = false) {
-    // Parse per_page and page_no to integers
-    per_page = parseInt(per_page);
-    page_no = parseInt(page_no);
+  per_page = parseInt(per_page);
+  page_no = parseInt(page_no);
 
-    try {
-        const user_meta_url = `${MODULE1_BASE_URL}/wp-json/nellalink/v2/smart-meta-manager/user/${user_id}?meta_key=_username`;
-        const user_meta_response = await axios.get(user_meta_url);
+  try {
+    // 1. Get username from user meta
+    const user_meta_url = `${MODULE1_BASE_URL}/wp-json/nellalink/v2/smart-meta-manager/user/${user_id}?meta_key=_username`;
+    const user_meta_response = await axios.get(user_meta_url);
+    const username = user_meta_response.data.data._username;
 
-        const username = user_meta_response.data.data._username
+    // 2. Define all currencies you want to include in the filter
+    const currencies = ["bnb", "usdt", "szcb", "szcbii", "hhc"];
 
-        //const get_users_api_url = `${MODULE1_BASE_URL}/wp-json/rimplenet/v3/users?page_no=${page_no}&per_page=${per_page}&meta_queries[0][key]=rimplenet_referrer_sponsor&meta_queries[0][value]=${username}&meta_queries[0][compare]=%3D&meta_queries[1][key]=referral_bonus_pattern_1_paid_to&meta_queries[1][value]=${username}&meta_queries[1][compare]=NOT%20EXISTS&meta_queries[2][key]=user_withdrawable_bal_usdt&meta_queries[2][value]=0&meta_queries[2][compare]=%3E&meta_queries_relation=AND&has_published_posts=rimplenettransaction&order_by=ID&order=ASC&metas_to_retrieve=nll_user_email_address_verified,phone_number,rimplenet_referrer_sponsor,referral_bonus_paid_to`;
-        const get_users_api_url = `${MODULE1_BASE_URL}/wp-json/rimplenet/v3/users/complex-queries?order_by=ID&order=ASC&page_no=${page_no}&per_page=${per_page}&meta_key=rimplenet_referrer_sponsor&meta_value=${username}&has_published_posts=rimplenettransaction&post_meta[0][0][key]=txn_type&post_meta[0][0][value]=CREDIT&post_meta[0][0][internal_relation]=AND&post_meta[0][0][relation]=AND&post_meta[1][0][key]=currency&post_meta[1][0][value]=bnb&post_meta[1][0][internal_relation]=AND&post_meta[1][0][relation]=OR&post_meta[1][1][key]=currency&post_meta[1][1][value]=usdt&post_meta[1][1][internal_relation]=AND&post_meta[1][1][relation]=OR&post_meta[1][0][relation]=OR&post_meta[1][2][key]=currency&post_meta[1][2][value]=szcb&post_meta[1][2][internal_relation]=AND&post_meta[1][2][relation]=OR&post_meta_relation=AND`; 
-        const referred_users = await axios.get(get_users_api_url);
+    // 3. Build currency query part dynamically
+    const currencyParams = currencies
+      .map((cur, index) => {
+        return `&post_meta[1][${index}][key]=currency` +
+               `&post_meta[1][${index}][value]=${cur}` +
+               `&post_meta[1][${index}][internal_relation]=AND` +
+               `&post_meta[1][${index}][relation]=OR`;
+      })
+      .join('');
 
-        return {
-                status: true,
-                status_code: 200,
-                message: "User Referred Lists Retrieved Successfully",
-                data : {  user_id : user_id,
-                          username : username,
-                          user_meta_response : user_meta_response.data,
-                          referred_users : referred_users.data,
-                        }
-            };
-        
-    } catch (error) {
-        console.error('Error fetchReferredUsers:', error);
-        throw error;
-    }
+    // 4. Build the full query URL cleanly
+    const get_users_api_url = `${MODULE1_BASE_URL}/wp-json/rimplenet/v3/users/complex-queries` +
+      `?order_by=ID` +
+      `&order=ASC` +
+      `&page_no=${page_no}` +
+      `&per_page=${per_page}` +
+      `&meta_key=rimplenet_referrer_sponsor` +
+      `&meta_value=${username}` +
+      `&has_published_posts=rimplenettransaction` +
+      `&post_meta[0][0][key]=txn_type` +
+      `&post_meta[0][0][value]=CREDIT` +
+      `&post_meta[0][0][internal_relation]=AND` +
+      `&post_meta[0][0][relation]=AND` +
+      `${currencyParams}` +
+      `&post_meta_relation=AND`;
+
+    // 5. Fetch referred users
+    const referred_users = await axios.get(get_users_api_url);
+
+    // 6. Return response data
+    return {
+      status: true,
+      status_code: 200,
+      message: "User Referred Lists Retrieved Successfully",
+      data: {
+        user_id: user_id,
+        username: username,
+        user_meta_response: user_meta_response.data,
+        referred_users: referred_users.data
+      }
+    };
+
+  } catch (error) {
+    console.error('Error fetchReferredUsers:', error);
+    throw error;
+  }
 }
 
 async function payReferralBonustoReferrerSponsor(user_id_referrer_sponsor, $referral_bonus_pattern, $metas ) {

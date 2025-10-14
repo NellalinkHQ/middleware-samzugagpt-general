@@ -10,7 +10,8 @@ const {
     withdrawUserBEP20toCentralAddress, 
     pushUserBEP20TransactionstoUserWallet,
     withdrawUserBNBtoCentralAddress,
-    pushUserBNBTransactionstoUserWallet
+    pushUserBNBTransactionstoUserWallet,
+    getAllBep20TokenAddresses
 } = require('../utils');
 const MODULE1_CRYPTOCURRENCY_BSCSCAN_NETWORK = process.env.MODULE1_CRYPTOCURRENCY_BSCSCAN_NETWORK.toLowerCase();
 let wsProvider, httpProvider;
@@ -43,12 +44,18 @@ function initializeProviders() {
       // Don't restart immediately, let it handle reconnection
     });
 
-    wsProvider.on('close', () => {
+    // Handle connection state changes (ethers.js v6 compatible)
+    wsProvider._websocket?.addEventListener('close', () => {
       console.log('🔌 WebSocket connection closed, attempting to reconnect...');
     });
 
-    wsProvider.on('open', () => {
+    wsProvider._websocket?.addEventListener('open', () => {
       console.log('✅ WebSocket connection established');
+      console.log('🔍 WebSocket ready state:', wsProvider._websocket?.readyState);
+    });
+
+    wsProvider._websocket?.addEventListener('error', (error) => {
+      console.error('❌ WebSocket error:', error);
     });
 
     console.log(`🌐 Initialized providers for ${MODULE1_CRYPTOCURRENCY_BSCSCAN_NETWORK} network`);
@@ -72,48 +79,73 @@ function monitorBEP20Transfers() {
     monitorStatus.bep20Monitor.running = true;
     monitorStatus.bep20Monitor.startedAt = new Date().toISOString();
 
+
+    // Use proper ethers.js v6 event filtering syntax
     const TRANSFER_TOPIC = ethers.id("Transfer(address,address,uint256)");
+    
+    // Get all unique BEP20 token addresses from utils
+    const uniqueTokenAddresses = getAllBep20TokenAddresses(MODULE1_CRYPTOCURRENCY_BSCSCAN_NETWORK);
+    
+  
+    const filter = {
+      address: uniqueTokenAddresses, // Use unique token addresses from utils
+      topics: [TRANSFER_TOPIC]
+    };
+    
+    console.log(`🔍 Setting up filter for 📊 Monitoring ${uniqueTokenAddresses.length} unique BEP20 token addresse:`, filter);
 
-    wsProvider.on(
-      {
-        address: null,
-        topics: [TRANSFER_TOPIC],
-      },
-      (log) => {
-        // Update last activity
-        monitorStatus.bep20Monitor.lastActivity = new Date().toISOString();
-        try {
-          const from = `0x${log.topics[1].slice(26)}`.toLowerCase();
-          const to = `0x${log.topics[2].slice(26)}`.toLowerCase();
+    
+    wsProvider.on(filter, (log) => {
+     
+      // Update last activity
+      monitorStatus.bep20Monitor.lastActivity = new Date().toISOString();
+      try {
 
-          if (!log.data || log.data === "0x") {
-            throw new Error("Empty or invalid data in token transfer log");
-          }
-
-         // console.log(`\n💠 BEP-20 Token Monitor Scanning!`);
-
-          const value = ethers.toBigInt(log.data);
-
-          if (getMonitoredAddresses().includes(to)) {
-            console.log(`\n💠 BEP-20 Token Deposit Detected!`);
-            console.log(`📥 From: ${from}`);
-            console.log(`➡️ To: ${to}`);
-            console.log(`🔗 Token Contract: ${log.address}`);
-            console.log(`🔗 Tx Hash: ${log.transactionHash}`);
-            console.log(
-              `💸 Amount: ${ethers.formatUnits(value, 18)} (assumes 18 decimals)`
-            );
-            
-            // Process BEP20 token directly (non-blocking)
-            processBEP20Transaction(to, log.address, log.transactionHash).catch(error => {
-              console.error(`❌ Error processing BEP20 transaction:`, error.message);
-            });
-          }
-        } catch (err) {
-          //console.error("⚠️ Error BEP20 Monitor:", err.message);
+        if (!log.data || log.data === "0x") { 
+          throw new Error("Empty or invalid data in token transfer log");
         }
+
+        const iface = new ethers.Interface([
+          "event Transfer(address indexed from, address indexed to, uint256 value)"
+        ]);
+        const { from, to, value } = iface.parseLog(log).args;
+       
+
+        
+
+        // 👇 Convert to lowercase
+        const fromAddress = from.toLowerCase();
+        const toAddress = to.toLowerCase();
+        const contractAddress = log.address.toLowerCase();
+        const transactionHash = log.transactionHash;
+        
+
+        if (getMonitoredAddresses().includes(toAddress)) {
+
+          // Log the transaction details
+          console.log(`\n💠 BEP-20 Token Deposit Detected!::`, {
+            from: fromAddress,
+            to: toAddress,
+            contractAddress: contractAddress,
+            value: value,
+            topics: log.topics,
+            data: log.data,
+            transactionHash: transactionHash
+          });
+          console.log(
+            `💸 Amount: ${ethers.formatUnits(value, 18)} (assumes 18 decimals)`
+          );
+          
+          // Process BEP20 token directly (non-blocking)
+          processBEP20Transaction(toAddress, contractAddress, transactionHash).catch(error => {
+            console.error(`❌ Error processing BEP20 transaction:`, error.message);
+          });
+        }
+      } catch (err) {
+        console.error("⚠️ Error BEP20 Monitor:", err.message);
+        console.error("⚠️ Error details:", err);
       }
-    );
+    });
 
     console.log('✅ BEP-20 Monitor started successfully');
   } catch (error) {
@@ -138,7 +170,12 @@ function monitorBNBDeposits() {
       // console.log(`\n🔍 BNB Monitor Scanning block: ${blockNumber}`);
 
       try {
-        const block = await httpProvider.getBlock(blockNumber);
+        const block = await httpProvider.getBlock(blockNumber, true);
+        if (!block.transactions || block.transactions.length === 0) {
+          // 👌 perfectly normal on some blocks
+          console.log(`ℹ️ Block ${blockNumber} has no transactions`);
+          
+        }
         for (const txHash of block.transactions) {
           const tx = await httpProvider.getTransaction(txHash);
           if (tx.to && getMonitoredAddresses().includes(tx.to.toLowerCase())) {
@@ -156,6 +193,7 @@ function monitorBNBDeposits() {
         }
       } catch (err) {
         //console.error("⚠️ Error BNB Monitor:", err.message);
+        //console.error("⚠️ Error details:", err);
       }
     });
 
