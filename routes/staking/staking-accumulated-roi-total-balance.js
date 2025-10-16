@@ -6,6 +6,14 @@ const { handleTryCatchError } = require('../../middleware-utils/custom-try-catch
 const MODULE1_STAKING_BASE_URL = process.env.MODULE1_STAKING_BASE_URL;
 const MODULE1_STAKING_API_KEY = process.env.MODULE1_STAKING_API_KEY;
 
+// Import staking utils calculators
+const {
+    calculateStakingROIMetricsFromMetaData,
+    calculateStakingROIMetricsFromMetaDataPattern2,
+    calculateStakingMetricsFromMetaData,
+    calculateStakingMetricsFromMetaDataPattern2
+} = require('./utils');
+
 
 router.get('/:walletID', async function(req, res, next) {
     try {
@@ -28,10 +36,6 @@ router.get('/:walletID', async function(req, res, next) {
         // Extract JWT Bearer token from the request headers and remove the Bearer keyword
         const userBearerJWToken = req.headers.authorization.split(' ')[1];
 
-        // Dynamically retrieve the base URL
-        // const baseURL = `${req.protocol}://${req.get('host')}`;
-        const baseURL = `https://middleware-rimplenet-general.samzugagpt.com`;
-
         // Call the first endpoint to retrieve staking by user
         const getUserStakingUrl = `${MODULE1_STAKING_BASE_URL}/wp-json/rimplenet/v3/transactions?user_id=${user_id}&meta_key=currency&meta_value=${wallet_id_locked}&order=DESC&pageno=1&per_page=100&metas_to_retrieve=_ALL&transaction_owner_user_metas_to_retrieve=_current_user_balance,_user_email,eth_crypto_wallet_deposit_address,phone_number,rimplenet_referrer_sponsor`;
         const getUserStakingResponse = await axios.get(getUserStakingUrl, {
@@ -48,8 +52,8 @@ router.get('/:walletID', async function(req, res, next) {
 
         // Loop through each transaction
         for (const transaction of stakingTransactions) {
-            // Call function to calculate maximum withdrawal amount for each transaction
-            const maxWithdrawalAmount = await calculateMaxStakingWithdrawalAmount(transaction);
+            // Use utils-based calculator (handles normal and pattern_2 safely)
+            const maxWithdrawalAmount = await calculateMaxFromTransactionViaUtils(transaction);
             maxWithdrawalAmount.staking_transaction_id = transaction.ID;
             maxWithdrawalAmounts.push(maxWithdrawalAmount);
         }
@@ -98,73 +102,76 @@ router.get('/:walletID', async function(req, res, next) {
     }
 });
 
+// Replace old function with utils-based computation
+function calculateMaxFromTransactionViaUtils(stakingMetaResponse) {
+    const metas = stakingMetaResponse.metas || {};
+    const getMeta = (key) => (metas[key] && metas[key][0] !== undefined ? metas[key][0] : undefined);
 
-function calculateMaxStakingWithdrawalAmount(stakingMetaResponse) {
-    let staking_amount, staking_roi_interval_payment_amount, staking_roi_interval_payment_percentage, staking_roi_payment_wallet_id, accumulated_total_roi_at_end_of_staking_contract, accumulated_total_amount_at_end_of_staking_contract, staking_roi_payment_startime_ts, staking_roi_payment_endtime_ts, staking_last_withdrawal_ts, staking_roi_amount_remaining_to_be_paid, staking_roi_amount_withdrawn_so_far;
-    
-    const timestamp_interval_values = {
-        every_second: { ts: 1, name: "Second", name_repetition: "Every Second" },
-        every_minute: { ts: 60, name: "Minute", name_repetition: "Every Minute" },
-        every_hour: { ts: 3600, name: "Hour", name_repetition: "Every Hour" },
-        every_day: { ts: 86400, name: "Day", name_repetition: "Daily" },
-        every_week: { ts: 604800, name: "Week", name_repetition: "Weekly" },
-        every_month: { ts: 2592000, name: "Month", name_repetition: "Monthly" },
-        every_year: { ts: 31536000, name: "Year", name_repetition: "Yearly" }
+    // helpers to coerce numbers safely
+    const toNumber = (val, def = 0) => {
+        if (val === undefined || val === null || val === '') return def;
+        const num = Number(val);
+        return isNaN(num) ? def : num;
+    };
+    const toInt = (val, def = 0) => {
+        if (val === undefined || val === null || val === '') return def;
+        const num = parseInt(val);
+        return isNaN(num) ? def : num;
     };
 
-    let staking_roi_payment_pattern = stakingMetaResponse.metas.staking_roi_payment_pattern[0];
+    // normalize interval to safe default
+    const validIntervals = new Set(['every_second','every_minute','every_hour','every_day','every_week','every_month','every_year']);
+    const normalizeInterval = (val) => (validIntervals.has((val||'').toString()) ? val : 'every_day');
 
-    if (staking_roi_payment_pattern === "internal_pattern_2") {
-        staking_amount = parseFloat(stakingMetaResponse.metas.staking_amount_internal_pattern_2[0]);
-        staking_roi_interval_payment_amount = parseFloat(stakingMetaResponse.metas.staking_roi_interval_payment_amount_internal_pattern_2[0]);
-        staking_roi_interval_payment_percentage = parseFloat(stakingMetaResponse.metas.staking_roi_interval_payment_percentage_internal_pattern_2[0]);
-        staking_roi_payment_wallet_id = stakingMetaResponse.metas.staking_roi_payment_wallet_id_internal_pattern_2[0];
-        accumulated_total_roi_at_end_of_staking_contract = parseFloat(stakingMetaResponse.metas.staking_roi_full_payment_amount_at_end_of_contract_internal_pattern_2[0]);
-        accumulated_total_amount_at_end_of_staking_contract = staking_amount + accumulated_total_roi_at_end_of_staking_contract;
+    // Detect pattern
+    const pattern = getMeta('staking_roi_payment_pattern');
+    const isPattern2 = pattern === 'internal_pattern_2';
 
-        staking_roi_payment_startime_ts = parseInt(stakingMetaResponse.metas.staking_roi_payment_startime_ts_internal_pattern_2[0]);
-        staking_roi_payment_endtime_ts = parseInt(stakingMetaResponse.metas.staking_roi_payment_endtime_ts_internal_pattern_2[0]);
-        staking_last_withdrawal_ts = parseInt(stakingMetaResponse.metas.staking_roi_last_withdrawal_ts_internal_pattern_2[0]);
-
-        staking_roi_amount_remaining_to_be_paid = parseFloat(stakingMetaResponse.metas.staking_roi_amount_remaining_to_be_paid_internal_pattern_2[0]);
-        staking_roi_amount_withdrawn_so_far = parseFloat(stakingMetaResponse.metas.staking_roi_amount_withdrawn_so_far_internal_pattern_2[0]);
+    // Build flat meta object for utils (sanitize numerics)
+    let stakingMetaData;
+    if (isPattern2) {
+        stakingMetaData = {
+            staking_amount_internal_pattern_2: toNumber(getMeta('staking_amount_internal_pattern_2')),
+            staking_roi_interval_payment_amount_internal_pattern_2: toNumber(getMeta('staking_roi_interval_payment_amount_internal_pattern_2')),
+            staking_roi_payment_interval: normalizeInterval(getMeta('staking_roi_payment_interval')),
+            staking_roi_payment_startime_ts_internal_pattern_2: toInt(getMeta('staking_roi_payment_startime_ts_internal_pattern_2')),
+            staking_roi_payment_endtime_ts_internal_pattern_2: toInt(getMeta('staking_roi_payment_endtime_ts_internal_pattern_2')),
+            staking_roi_last_withdrawal_ts_internal_pattern_2: toInt(getMeta('staking_roi_last_withdrawal_ts_internal_pattern_2')) || 0,
+            staking_roi_full_payment_amount_at_end_of_contract_internal_pattern_2: toNumber(getMeta('staking_roi_full_payment_amount_at_end_of_contract_internal_pattern_2')),
+            staking_roi_amount_withdrawn_so_far_internal_pattern_2: toNumber(getMeta('staking_roi_amount_withdrawn_so_far_internal_pattern_2')) || 0,
+            staking_plan_id: getMeta('staking_plan_id'),
+            staking_capital_withdrawn_at: toInt(getMeta('staking_capital_withdrawn_at')),
+            stop_roi_after_capital_withdrawal: getMeta('stop_roi_after_capital_withdrawal')
+        };
     } else {
-        staking_amount = parseFloat(stakingMetaResponse.metas.staking_amount[0]);
-        staking_roi_interval_payment_amount = parseFloat(stakingMetaResponse.metas.staking_roi_interval_payment_amount[0]);
-        staking_roi_interval_payment_percentage = parseFloat(stakingMetaResponse.metas.staking_roi_interval_payment_percentage[0]);
-        staking_roi_payment_wallet_id = stakingMetaResponse.metas.staking_roi_payment_wallet_id[0];
-        accumulated_total_roi_at_end_of_staking_contract = parseFloat(stakingMetaResponse.metas.staking_roi_full_payment_amount_at_end_of_contract[0]);
-        accumulated_total_amount_at_end_of_staking_contract = staking_amount + accumulated_total_roi_at_end_of_staking_contract;
-
-        staking_roi_payment_startime_ts = parseInt(stakingMetaResponse.metas.staking_roi_payment_startime_ts[0]);
-        staking_roi_payment_endtime_ts = parseInt(stakingMetaResponse.metas.staking_roi_payment_endtime_ts[0]);
-        staking_last_withdrawal_ts = parseInt(stakingMetaResponse.metas.staking_roi_last_withdrawal_ts[0]);
-
-        staking_roi_amount_remaining_to_be_paid = parseFloat(stakingMetaResponse.metas.staking_roi_amount_remaining_to_be_paid[0]);
-        staking_roi_amount_withdrawn_so_far = parseFloat(stakingMetaResponse.metas.staking_roi_amount_withdrawn_so_far[0]);
+        stakingMetaData = {
+            staking_amount: toNumber(getMeta('staking_amount')),
+            staking_roi_interval_payment_amount: toNumber(getMeta('staking_roi_interval_payment_amount')),
+            staking_roi_payment_interval: normalizeInterval(getMeta('staking_roi_payment_interval')),
+            staking_roi_payment_startime_ts: toInt(getMeta('staking_roi_payment_startime_ts')),
+            staking_roi_payment_endtime_ts: toInt(getMeta('staking_roi_payment_endtime_ts')),
+            staking_roi_last_withdrawal_ts: toInt(getMeta('staking_roi_last_withdrawal_ts')) || 0,
+            staking_roi_full_payment_amount_at_end_of_contract: toNumber(getMeta('staking_roi_full_payment_amount_at_end_of_contract')),
+            staking_roi_amount_withdrawn_so_far: toNumber(getMeta('staking_roi_amount_withdrawn_so_far')) || 0,
+            staking_plan_id: getMeta('staking_plan_id'),
+            staking_capital_withdrawn_at: toInt(getMeta('staking_capital_withdrawn_at')),
+            stop_roi_after_capital_withdrawal: getMeta('stop_roi_after_capital_withdrawal')
+        };
     }
 
-    const staking_roi_accumulate_datetime_now_ts = Math.floor(Date.now() / 1000); // Converted to seconds
-    const count_number_of_staking_payment_interval_from_startime_till_now = Math.floor((staking_roi_accumulate_datetime_now_ts - staking_roi_payment_startime_ts) / timestamp_interval_values[stakingMetaResponse.metas.staking_roi_payment_interval[0]].ts);
-    const accumulatedROINow = count_number_of_staking_payment_interval_from_startime_till_now * staking_roi_interval_payment_amount;
+    // Compute display (earned till now) and withdrawal metrics via utils
+    const displayMetrics = isPattern2
+        ? calculateStakingMetricsFromMetaDataPattern2(stakingMetaData)
+        : calculateStakingMetricsFromMetaData(stakingMetaData);
 
-    let maximum_amount_user_can_withdraw_now = (count_number_of_staking_payment_interval_from_startime_till_now * staking_roi_interval_payment_amount) - parseFloat(staking_roi_amount_withdrawn_so_far);
-
-    // let accumulated_roi_user_can_withdraw_now;
-    // let accumulated_roi_user_have_already_withdraw;
-    // if (staking_last_withdrawal_ts === 0) {
-    //     accumulated_roi_user_can_withdraw_now = accumulatedROINow;
-    //     accumulated_roi_user_have_already_withdraw = 0;
-    // } else {
-    //     const count_number_of_staking_payment_interval_from_last_user_withdrawal_till_now = Math.floor((staking_roi_accumulate_datetime_now_ts - staking_last_withdrawal_ts) / timestamp_interval_values[stakingMetaResponse.metas.staking_roi_payment_interval[0]].ts);
-    //     accumulated_roi_user_can_withdraw_now = count_number_of_staking_payment_interval_from_last_user_withdrawal_till_now * staking_roi_interval_payment_amount;
-    //     accumulated_roi_user_have_already_withdraw = accumulatedROINow - accumulated_roi_user_can_withdraw_now;
-    // }
+    const withdrawMetrics = isPattern2
+        ? calculateStakingROIMetricsFromMetaDataPattern2(stakingMetaData)
+        : calculateStakingROIMetricsFromMetaData(stakingMetaData);
 
     return {
-        "maximum_staking_accumulated_roi_amount_user_can_withdraw_now": maximum_amount_user_can_withdraw_now,
-        "staking_accumulated_roi_amount_already_withdrawn_by_user": staking_roi_amount_withdrawn_so_far,
-        "staking_accumulated_roi_amount_till_now": accumulatedROINow,
+        maximum_staking_accumulated_roi_amount_user_can_withdraw_now: Number(withdrawMetrics.accumulated_roi_user_can_withdraw_now || 0),
+        staking_accumulated_roi_amount_already_withdrawn_by_user: Number(withdrawMetrics.accumulated_roi_user_have_already_withdraw || 0),
+        staking_accumulated_roi_amount_till_now: Number(displayMetrics.accumulated_roi_now || 0)
     };
 }
 

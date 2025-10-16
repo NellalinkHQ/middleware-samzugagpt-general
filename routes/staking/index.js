@@ -36,10 +36,6 @@ router.use('/withdraw-roi/plan-3', userJWTSecurityCheck, require('./withdraw-sta
 router.use('/withdraw-roi/plan-4', userJWTSecurityCheck, require('./withdraw-staking-roi/plan-4'));
 router.use('/withdraw-roi/plan-5', userJWTSecurityCheck, require('./withdraw-staking-roi/plan-5'));
 
-
-/* Get Accumulated Staking ROI */
-router.use('/accumulated-roi', userJWTSecurityCheck, require('./staking-accumulated-roi'));
-
 /* Get Staking Total Interest Balance */
 router.use('/total-accumulated-roi', userJWTSecurityCheck, require('./staking-accumulated-roi-total-balance'));
 
