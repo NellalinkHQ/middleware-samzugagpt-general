@@ -15,7 +15,7 @@ const MODULE1_BASE_URL = process.env.MODULE1_BASE_URL;
 const MODULE1_BASE_API_KEY = process.env.MODULE1_BASE_API_KEY;
 const MODULE1_BASE_USER_JWT_SECRET_KEY = process.env.MODULE1_BASE_USER_JWT_SECRET_KEY;
 
-router.post('/', async function(req, res, next) {
+router.post('/disable-referral-bonus', async function(req, res, next) {
     try {
         // Extracting data from the request body
         const { user_id, meta_data } = req.body;
