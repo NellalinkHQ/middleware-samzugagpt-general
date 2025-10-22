@@ -18,7 +18,7 @@ const { handleTryCatchError } = require('../../middleware-utils/custom-try-catch
 const { approveWithdrawalTransaction } = require('../withdrawal/utils');
 
 // Import cryptocurrency utils to get BEP20 token contract info
-const { getBep20TokenContract } = require('./utils');
+const { getBep20TokenContract, BEP20_TOKEN_CONTRACTS } = require('./utils');
 
 // Initialize ENV 
 const MODULE1_BASE_URL = process.env.MODULE1_BASE_URL;
