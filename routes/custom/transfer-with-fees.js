@@ -234,16 +234,41 @@ router.post('/', async function(req, res, next) {
         }
 
 
+        // Helper function to calculate fee amount (handles percentage or fixed amount)
+        const calculateFeeAmount = (feeValue, baseAmount) => {
+            if (!feeValue || feeValue <= 0) return 0;
+            
+            // Convert to string and check if it contains '%' sign
+            const feeStr = String(feeValue).trim();
+            const isPercentage = feeStr.includes('%');
+            
+            if (isPercentage) {
+                // Remove % sign and calculate percentage
+                const percentageValue = parseFloat(feeStr.replace('%', '').replace(/\s/g, ''));
+                if (isNaN(percentageValue) || percentageValue <= 0) return 0;
+                return (baseAmount * percentageValue) / 100;
+            } else {
+                // Fixed amount (not a percentage)
+                const fixedAmount = parseFloat(feeStr);
+                return isNaN(fixedAmount) ? 0 : fixedAmount;
+            }
+        };
+
+        // Calculate actual fee amounts (handling percentages)
+        const state_fee_amount = calculateFeeAmount(state_fee, amount);
+        const national_fee_amount = calculateFeeAmount(national_fee, amount);
+
+        // Calculate amount to credit to receiver (deduct fees from amount)
+        let amount_to_credit = amount;
+        if (state_fee_amount > 0) {
+            amount_to_credit -= state_fee_amount;
+        }
+        if (national_fee_amount > 0) {
+            amount_to_credit -= national_fee_amount;
+        }
+
         let credit_transaction_response;
         if (debit_transaction_response.status) {// meaning debit was true i.e successful
-        
-            let amount_to_credit = amount;
-            if (state_fee > 0) {
-                amount_to_credit += state_fee;
-            }
-            if (national_fee > 0) {
-                amount_to_credit += national_fee;
-            }
 
         // Step 3: Credit User
         const credit_url = `${MODULE1_BASE_URL}/wp-json/rimplenet/v1/credits`;
@@ -310,12 +335,12 @@ router.post('/', async function(req, res, next) {
         }
 
         let credit_transaction_response_state = { status: true }; // Default to success if no state fee
-        if (state_fee > 0) {
+        if (state_fee_amount > 0) {
             const credit_url_state = `${MODULE1_BASE_URL}/wp-json/rimplenet/v1/credits`;
             const credit_request_body_state = {
                 "request_id": `state_user_to_user_transfer_credit_${request_id}`,
                 "user_id": user_id_receiver_state_fee,
-                "amount": state_fee,
+                "amount": state_fee_amount,
                 "wallet_id": wallet_id,
                 "note": `State Fee - Transfer from Internal User`,
                 "meta_data": {
@@ -341,12 +366,12 @@ router.post('/', async function(req, res, next) {
         }
 
         let credit_transaction_response_national = { status: true }; // Default to success if no national fee
-        if (national_fee > 0) {
+        if (national_fee_amount > 0) {
             const credit_url_national = `${MODULE1_BASE_URL}/wp-json/rimplenet/v1/credits`;
             const credit_request_body_national = {
                 "request_id": `national_user_to_user_transfer_credit_${request_id}`,
                 "user_id": user_id_receiver_national_fee,
-                "amount": national_fee,
+                "amount": national_fee_amount,
                 "wallet_id": wallet_id,
                 "note": `National Fee - Transfer from Internal User`,
                 "meta_data": {
@@ -389,6 +414,11 @@ router.post('/', async function(req, res, next) {
                 transfer_details: {
                     transfer_amount: amount,
                     transfer_fee: transfer_fee || 0,
+                    state_fee: state_fee || null,
+                    state_fee_amount: state_fee_amount || 0,
+                    national_fee: national_fee || null,
+                    national_fee_amount: national_fee_amount || 0,
+                    amount_to_receiver: amount_to_credit || amount,
                     wallet_id: wallet_id,
                     limits: {
                         minimum: minimum_transfer_amount === null ? "No minimum" : minimum_transfer_amount,
