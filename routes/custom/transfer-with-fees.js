@@ -56,7 +56,7 @@ router.post('/', async function(req, res, next) {
 
         // Fetch dynamic transfer limits
         const transferLimits = await fetchTransferLimits(wallet_id, userBearerJWToken);
-        const { minimum_transfer_amount, maximum_transfer_amount, transfer_fee } = transferLimits;
+        const { minimum_transfer_amount, maximum_transfer_amount, transfer_fee, user_id_receiver_transfer_fee, state_fee, user_id_receiver_state_fee, national_fee, user_id_receiver_national_fee } = transferLimits;
 
         //main deal
         let wallet_id_fee = "szcb2";
@@ -236,13 +236,21 @@ router.post('/', async function(req, res, next) {
 
         let credit_transaction_response;
         if (debit_transaction_response.status) {// meaning debit was true i.e successful
+        
+            let amount_to_credit = amount;
+            if (state_fee > 0) {
+                amount_to_credit += state_fee;
+            }
+            if (national_fee > 0) {
+                amount_to_credit += national_fee;
+            }
 
         // Step 3: Credit User
         const credit_url = `${MODULE1_BASE_URL}/wp-json/rimplenet/v1/credits`;
         const credit_request_body = {
             "request_id": `user_to_user_transfer_credit_${request_id}`,
             "user_id": user_id_transfer_to,
-            "amount": amount,
+            "amount": amount_to_credit,
             "wallet_id": wallet_id,
             "note": `Transfer from Internal User`,
              "meta_data": {
@@ -276,7 +284,7 @@ router.post('/', async function(req, res, next) {
             const credit_url_fee = `${MODULE1_BASE_URL}/wp-json/rimplenet/v1/credits`;
             const credit_request_body_fee = {
                 "request_id": `fee_user_to_user_transfer_credit_${request_id}`,
-                "user_id": 1,
+                "user_id": user_id_receiver_transfer_fee,
                 "amount": amount_fee,
                 "wallet_id": wallet_id_fee,
                 "note": `Fee - Transfer from Internal User`,
@@ -301,6 +309,67 @@ router.post('/', async function(req, res, next) {
             credit_transaction_response_fee = credit_response_fee.data;
         }
 
+        let credit_transaction_response_state = { status: true }; // Default to success if no state fee
+        if (state_fee > 0) {
+            const credit_url_state = `${MODULE1_BASE_URL}/wp-json/rimplenet/v1/credits`;
+            const credit_request_body_state = {
+                "request_id": `state_user_to_user_transfer_credit_${request_id}`,
+                "user_id": user_id_receiver_state_fee,
+                "amount": state_fee,
+                "wallet_id": wallet_id,
+                "note": `State Fee - Transfer from Internal User`,
+                "meta_data": {
+                    "user_id_transfer_from": user_id,
+                    "user_id_transfer_to":  user_id_transfer_to, //AS WAS RETRIEVED DYNAMICALLY
+                    "user_meta_key_transfer_to": meta_key,
+                    "user_meta_value_transfer_to": meta_value,
+                    "transaction_type_action_type": "state_user_to_user_transfer",
+                    "transaction_type_category": "state_internal_transfer",
+                    "transaction_external_processor": "middleware1_module1",
+                    "transaction_approval_status": "user_middleware_processed",
+                    "transaction_approval_method": "middleware",
+                  },
+            };
+
+            const credit_response_state = await axios.post(credit_url_state, credit_request_body_state, {
+                headers: {
+                    'x-api-key': MODULE1_BASE_API_KEY,
+                    'Authorization': `Bearer ${userBearerJWToken}` // Append JWT Bearer token to headers
+                }
+            });
+            credit_transaction_response_state = credit_response_state.data;
+        }
+
+        let credit_transaction_response_national = { status: true }; // Default to success if no national fee
+        if (national_fee > 0) {
+            const credit_url_national = `${MODULE1_BASE_URL}/wp-json/rimplenet/v1/credits`;
+            const credit_request_body_national = {
+                "request_id": `national_user_to_user_transfer_credit_${request_id}`,
+                "user_id": user_id_receiver_national_fee,
+                "amount": national_fee,
+                "wallet_id": wallet_id,
+                "note": `National Fee - Transfer from Internal User`,
+                "meta_data": {
+                    "user_id_transfer_from": user_id,
+                    "user_id_transfer_to": user_id_transfer_to, //AS WAS RETRIEVED DYNAMICALLY
+                    "user_meta_key_transfer_to": meta_key,
+                    "user_meta_value_transfer_to": meta_value,
+                    "transaction_type_action_type": "national_user_to_user_transfer",
+                    "transaction_type_category": "national_internal_transfer",
+                    "transaction_external_processor": "middleware1_module1",
+                    "transaction_approval_status": "user_middleware_processed",
+                    "transaction_approval_method": "middleware",
+                  },
+            };
+
+            const credit_response_national = await axios.post(credit_url_national, credit_request_body_national, {
+                headers: {
+                    'x-api-key': MODULE1_BASE_API_KEY,
+                    'Authorization': `Bearer ${userBearerJWToken}` // Append JWT Bearer token to headers
+                }   
+            });
+            credit_transaction_response_national = credit_response_national.data;
+        }
 
 
         // Success response
@@ -309,12 +378,14 @@ router.post('/', async function(req, res, next) {
             status_code: 200,
             message: "Internal Transfer Successful",
             data : {
-                user_id_from: 1,
+                user_id_from: user_id,
                 user_id_to: user_id_transfer_to,
                 debit_transaction_response_fee : debit_transaction_response_fee,
                 debit_transaction_response : debit_transaction_response,
                 credit_transaction_response : credit_transaction_response,
                 credit_transaction_response_fee : credit_transaction_response_fee,
+                credit_transaction_response_state : credit_transaction_response_state,
+                credit_transaction_response_national : credit_transaction_response_national,
                 transfer_details: {
                     transfer_amount: amount,
                     transfer_fee: transfer_fee || 0,
@@ -395,7 +466,7 @@ async function fetchTransferLimits(wallet_id, userBearerJWToken) {
     }
 
     try {
-        const metaKeys = `transfee_fee_${wallet_id},minimum_transfer_amount_${wallet_id},maximum_transfer_amount_${wallet_id}`;
+        const metaKeys = `transfee_fee_${wallet_id},user_id_receiver_transfer_fee_${wallet_id},state_fee_${wallet_id},user_id_receiver_state_fee_${wallet_id},national_fee_${wallet_id},user_id_receiver_national_fee_${wallet_id},minimum_transfer_amount_${wallet_id},maximum_transfer_amount_${wallet_id}`;
         const url = `${MODULE1_BASE_URL}/wp-json/nellalink/v2/smart-meta-manager/site-wide?meta_key=${metaKeys}`;
         
         const response = await axios.get(url, {
@@ -444,11 +515,21 @@ async function fetchTransferLimits(wallet_id, userBearerJWToken) {
         const minimum_transfer_amount = getValueOrDefault(data[`minimum_transfer_amount_${wallet_id}`], 'minimum');
         const maximum_transfer_amount = getValueOrDefault(data[`maximum_transfer_amount_${wallet_id}`], 'maximum');
         const transfer_fee = getValueOrDefault(data[`transfee_fee_${wallet_id}`], 'fee');
+        const user_id_receiver_transfer_fee = getValueOrDefault(data[`user_id_receiver_transfer_fee_${wallet_id}`], 'fee');
+        const state_fee = getValueOrDefault(data[`state_fee_${wallet_id}`], 'fee');
+        const user_id_receiver_state_fee = getValueOrDefault(data[`user_id_receiver_state_fee_${wallet_id}`], 'fee');
+        const national_fee = getValueOrDefault(data[`national_fee_${wallet_id}`], 'fee');
+        const user_id_receiver_national_fee = getValueOrDefault(data[`user_id_receiver_national_fee_${wallet_id}`], 'fee');
 
         const result = {
             minimum_transfer_amount,
             maximum_transfer_amount,
             transfer_fee,
+            user_id_receiver_transfer_fee,
+            state_fee,
+            user_id_receiver_state_fee,
+            national_fee,
+            user_id_receiver_national_fee,
             success: true,
             cached_at: new Date().toISOString()
         };
@@ -469,6 +550,11 @@ async function fetchTransferLimits(wallet_id, userBearerJWToken) {
             minimum_transfer_amount: null, // No minimum limit
             maximum_transfer_amount: null, // No maximum limit
             transfer_fee: null, // No fee
+            user_id_receiver_transfer_fee: null, // No fee user id
+            state_fee: null, // No state fee
+            user_id_receiver_state_fee: null, // No state fee user id
+            national_fee: null, // No national fee
+            user_id_receiver_national_fee: null, // No national fee user id
             success: false,
             error: error.message,
             cached_at: new Date().toISOString()
