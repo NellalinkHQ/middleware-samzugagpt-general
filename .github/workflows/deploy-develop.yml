@@ -1,4 +1,4 @@
-name: Deploy Latest Code to Test Server
+name: Deploy Latest Code to Dev Server
 on:
   push:
     branches:
