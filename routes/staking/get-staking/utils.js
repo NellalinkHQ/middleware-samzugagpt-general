@@ -8,7 +8,7 @@ const axios = require('axios');
 // Default values - these will be overridden by getter function
 const DEFAULT_SUPPORTED_STAKING_WALLETS = 'szcb,szcbii,hhc';
 const DEFAULT_EXCHANGE_RATE_TO_USDT_STAKING_INTEREST = '0.1';
-const DEFAULT_MINIMUM_STAKING_AMOUNT = '5';
+const DEFAULT_MINIMUM_STAKING_AMOUNT = '0.001';
 const DEFAULT_MAXIMUM_STAKING_AMOUNT = '100';
 const DEFAULT_MINIMUM_ROI_WITHDRAWAL_AMOUNT = '1';
 const DEFAULT_MAXIMUM_ROI_WITHDRAWAL_AMOUNT = '50';
